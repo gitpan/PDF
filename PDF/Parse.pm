@@ -1,5 +1,5 @@
 #
-# PDF::Parse.pm, version 1.07 Oct 1998 antro
+# PDF::Parse.pm, version 1.08 Dec 1998 antro
 #
 # Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
 #
@@ -8,7 +8,7 @@
 
 package PDF::Parse;
 
-$PDF::Parse::VERSION = "1.07";
+$PDF::Parse::VERSION = "1.08";
 
 require 5.004;
 require PDF::Core;
@@ -173,6 +173,19 @@ sub ReadInfo {
 
     last if />>\r?\n?/ ;
 
+#
+# iso chars support, courtesy of T. Drillich
+#
+    my($a,$n)='';
+    while(/(\\\d+)/) {
+       $a.=$`;
+       $_=$';
+       $n=$1;
+       $n=~s/\\//g;
+       $a.=chr(oct($n));
+    }
+    $a.=$_;
+    $_=$a;
     /\\\r?\n?$/ && do { s/\\\r?\n?//;
 		  $readinfo_buffer = $readinfo_buffer . $_;
 		  next;

@@ -1,4 +1,4 @@
-New Release: 1.07
+New Release: 1.08
 
 Name           DSLI  Description                                  Info
 -----------    ----  -------------------------------------------- -----
@@ -25,10 +25,10 @@ A Perl distribution :-)
 
 NEWS:
 
-The library is now able to deal correctly with the cross-platform
-PDF standard, i.e. PDF generated on a Mac can be correctly read on a
-Unix, for example.  It was a problem partially covered by the previous 
-release but still not correctly handled.
+Added support for the iso latin1 chars in the Getinfo ( Thanks to Thomas Drillich for the patch )
+
+For the people that have trouble with the "standard" install procedure under wintel platform, 
+now is available a quick and dirty install.bat in the main directory 
 
 AVAILABILITY:
 
