@@ -7,21 +7,23 @@ contained inside a PDF file. It is at its early development stage and
 a lot of work is necessary, but it works also with this few lines
 of code ( see the examples directory ). 
 
+Here are some examples of what it can do:
+
 Install as usual with:
 
         perl Makefile.PL
         make
         make install
 
-Then, you can try the two script in the example directory that tests 
-if a file is a PDF ( not looking at the .pdf extension :-) and the PDF 
-version used to write them.
+Then, you can try the scripts in the example directory that tests 
+if a file is a PDF ( not looking at the .pdf extension :-), the PDF 
+version used to write them and their number of pages.
 
 Enjoy
 
 Antonio "Antro" Rosella 
+<http://www.geocities.com/CapeCanaveral/Hangar/4794/>
 
 <antro@technologist.com> 
 <anface@yahoo.com> 
 <anface@geocities.com> 
-<Antonio.Rosella@agip.it>

@@ -1,5 +1,5 @@
 #
-# PDF.pm, version 1.02 Jan 1998 antro
+# PDF.pm, version 1.03 Jan 1998 antro
 #
 # Copyright (c) 1998 Antonio Rosella Italy
 #
@@ -8,7 +8,7 @@
 
 package PDF;
 
-$PDF::VERSION = "1.02";
+$PDF::VERSION = "1.03";
 
 require 5.004;
 use Carp;
@@ -22,7 +22,7 @@ my $Verbose = 0;
 
 @ISA = qw(Exporter);
 
-@EXPORT = qw( Pages );
+# @EXPORT = qw( Pages );
 @EXPORT_OK = qw( IsaPDF Pages TargetFile Version );
 use vars qw( $Verbose ) ;
 
@@ -38,6 +38,7 @@ my %PDF_Fields = (
    Catalog => {},
    PageTree => {},
    Updated => 0, 
+   Cross_Reference_Size => 0,
 );
 
   $/="\r";
@@ -56,9 +57,7 @@ sub DESTROY {
 # Close the file if not empty
 #
   my $self = shift;
-  $self->{File_Handler} && do {
-    close ( $self->{File_Handler} );
-  };
+  close ( $self->{File_Handler} ) if $self->{File_Handler} ;
 }
 
 sub Version { 
@@ -74,19 +73,18 @@ sub ReadCrossReference {
     my $offset=shift;
     my $self=shift;
 
-    my $object_nr;
-    my $object_offset;
     my $initial_number;
     my $obj_counter=0;
     my $global_obj_counter=0;
     my $buf;
+    my $first_level;
 
     seek $fd, $offset, 0;
     $_=<$fd>;
-    ! /xref\r?\n?/ && die "Can't read cross-reference section, according to trailer\n";
+    die "Can't read cross-reference section, according to trailer\n" if ! /xref\r?\n?/  ;
     while (<$fd>) {
       s/^\n//;
-      last if ( /^trailer\r?\n?/ ) ;
+      last if /^trailer\r?\n?/ ;
 #
 # An Object
 #
@@ -132,13 +130,18 @@ sub ReadCrossReference {
 #
 # Now the trailer
 #
-  while(<$fd>) {
-    /startxref\r?\n?/ && last ;
+while(<$fd>) {
+    last if /startxref\r?\n?/ ;
     /Size\s*\d+\r?\n?/ && do { s/\/Size\s*(\d+)\r?\n?/$1/;
- 		   $_ != $obj_counter && warn "Cross-reference table corrupted! or document updated ( not yet implemented :-(\n";
+		   if ( ! $self->{Cross_Reference_Size}) {
+		     $self->{Cross_Reference_Size} = $_ ;
+		     $first_level=1;
+		   }
 		   next;} ;
     /Root/ && do { s/\/Root\s+(\d+\s+\d+)\s+R\r?\n?/$1/;
-		   $self->{Root_Object}=$_;
+		   if ( ! $self->{Root_Object}) {
+		     $self->{Root_Object}=$_;
+		   }
 		   next;
 		 };
     /Info/ && do { 
@@ -153,18 +156,31 @@ sub ReadCrossReference {
 		   $PDF::Verbose && warn "Encrypt! Not yet implemented :-(\n";
 		   next;
 		 };
-    /Prev/ && do { $Updated++;
+    /Prev/ && do { 
+		   s/\/Prev\s*(\d+)\r?\n?/$1/;
+    		   $self->{Updated}=1;
+		   my $old_seek = tell $fd;
+		   $global_obj_counter += ReadCrossReference($fd,$_, $self );
+		   seek $fd, $old_seek, 0;
 		   $PDF::Verbose && warn "Document Updated! Not yet implemented :-(\n";
+		   if ($first_level ) {
+			$self->{Cross_Reference_Size} != $global_obj_counter &&
+			  warn "Cross-reference table corrupted! $global_obj_counter objects read, $self->{Cross_Reference_Size} requested \n";
+		   }
 		   next;
 		 };
   }
+  return $global_obj_counter;
 }
 
 sub TargetFile {
   my $self = shift;
   my $file = shift;
-  $self->{File_Name} && croak "Already linked to the file ",$self->{File_Name},"\n";
+
+  croak "Already linked to the file ",$self->{File_Name},"\n" if $self->{File_Name} ;
   
+  my $offset;
+
   if ( $file ) {
     open(FILE, "< $file") or croak "can't open $file: $!";
     $self->{File_Name} = $file ;
@@ -172,8 +188,8 @@ sub TargetFile {
     my $buf;
     read(FILE,$buf,4);
     if ( $buf ne "%PDF" ) {
-      $PDF::Verbose && print "File $_[0] is not PDF compliant !\n"; 
-      return 0 ;
+     print "File $_[0] is not PDF compliant !\n" if $PDF::Verbose ;
+     return 0 ;
     }
     read(FILE,$buf,4);
     $buf =~ s/-//;
@@ -187,7 +203,6 @@ sub TargetFile {
     $/ = "\n" if /\n/ ;
 
     seek FILE,-50,2;
-    my $offset;
     read( FILE, $offset, 50 );
     $offset =~ s/[^s]*startxref\r?\n?(\d*)\r?\n?%%EOF\r?\n?/$1/;
 
@@ -202,48 +217,52 @@ sub TargetFile {
 
 sub Pages {
   my $self = shift;
-  !($self->{File_Name}) && croak "PDF File not specified !\n";
+
+  croak "PDF File not specified !\n" if ! $self->{File_Name}  ; 
+
   open (FILE, "$self->{File_Name}");
   if ($self->{Catalog}) {
     my $ro = $self->{Root_Object};
     $ro =~ s/(\d+)\s+\d+/$1/;
+
     my $ro_gen=$self->{Gen_Num}[$ro];
     seek FILE, $self->{Objects}[$ro] ,0 ;
+    my $flag;
     while (<FILE>) {
-      /$ro\s+$ro_gen\r?\n?/ && next;
-      /<<\r?\n?/ && next;
-      /\/Pages/ && do { s/\/Pages\s+(\d+)\s+(\d+)\s+R/$1 $2/;
+      next if /$ro\s+$ro_gen\s+obj\r?\n?/ ; 
+      next if /<<\r?\n?/  ;
+      /\/Pages/ && do { s/\r?\n?\/Pages\s+(\d+)\s+(\d+)\s+R\r?\n?/$1 $2/;
 		      $self->{Catalog}->{Pages} = $_;
 		      my ($ind,$gen)=split(" ",$self->{Catalog}->{Pages});
 		      $self->{Gen_Num}[$ind] != $gen && die "Can't find Pages Node\n";
                       return ReadPage(\*FILE, $self->{Objects}[$ind], $self );
 		    };
-      />>\r?\n?/ && last ;
+      last if />>\r?\n?/ ;
     }
   }
   close(FILE);
 }
 
 sub ReadPage {
-  my $fd = shift;
-  my $offset=shift;
-  my $self=shift;
+    my $fd = shift;
+    my $offset=shift;
+    my $self=shift;
 
-  my $result;
+    my $result;
 
-  seek $fd, $offset, 0;
+    seek $fd, $offset, 0;
 
-  $_=<$fd>;
-  while(<$fd>) {
-    /<</ && next;
-    /^\/Type\s+/ && do { croak " Page tree corrupted!\n" if !(/\/Pages/ ); }; 
-    $result = $_ if ( /\/Count\s+/ ) ;
-    /\/Parent/ && next;
-    /\/Kids/ && next;
-    />>/ && last;
-  }
-  $result =~ s/\/Count\s+(\d+)\r?\n?/$1/;
-  return $result;
+    $_=<$fd>;
+    while(<$fd>) {
+      next if /<</ ;
+      /^\/Type\s+/ && do { croak " Page tree corrupted!\n" if !(/\/Pages/ ); }; 
+      $result = $_ if /\/Count\s+/ ;
+      next if /\/Parent/  ;
+      next if /\/Kids/  ;
+      last if />>/ ;
+    }
+    $result =~ s/\n?\r?\/Count\s+(\d+)\s*\r?\n?/$1/;
+    return $result;
 }
 
 1;
@@ -259,7 +278,7 @@ PDF - Library for PDF manipulation in Perl
   $pdf=PDF->new ;
   $pdf=PDF->new(filename);
   $result=$pdf->TargetFile( filename );
-  print " is a pdf file\n" if ( $pdf->IsaPDF ) ;
+  print "is a pdf file\n" if ( $pdf->IsaPDF ) ;
   print "Has ",$pdf->Pages," Pages \n";
   print "Use a PDF Version  ",$pdf->Version ," \n";
 
@@ -287,8 +306,7 @@ contained in the file.
 
 B<pdf_version> returns the PDF level used for writing a file.
 
-B<pdf_pages> gives the number of pages of a PDF file. This at the moment works
-only for un-updated files.
+B<pdf_pages> gives the number of pages of a PDF file. 
 
 =head1 Constructor
 
@@ -318,13 +336,9 @@ Returns the PDF version used for writing the object file.
 
 =item B<Pages>
 
-Returns the number of pages of the object file. At this 
-moment, it doesn't take into account the update section. 
-So, if a file was updated and new pages are added, it may 
-return the wrong number of pages . Setting the variable 
-B<$PDF::Verbose> can give some hints; As side effect, the 
-PDF object contains part of the Catalog structure after 
-the call.
+Returns the number of pages of the object file. As side effect, 
+the PDF object contains part of the Catalog structure after 
+the call ( more specifically, part of the Root Page ).
 
 =back
 
@@ -336,8 +350,7 @@ There are 2 variables that can be accessed:
 
 =item B<$PDF::VERSION>
 
-Contain the version of 
-the library installed
+Contain the version of the library installed
 
 =item B<$PDF::Verbose>
 

@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.1 1998/01/15 10:52:17 ag71333 Exp ag71333 $
+# $Id: Makefile.PL,v 1.2 1998/01/15 10:55:41 ag71333 Exp ag71333 $
 #
 # Copyright (c) 1998 Antonio Rosella Italy
 #
@@ -9,10 +9,6 @@ BEGIN { require 5.004 }
 
 use ExtUtils::MakeMaker 5.16, qw(WriteMakefile $Verbose);
 use Config;
-
-# my $os = $^O;
-# my $osvers = $Config{osvers};
-# $osvers =~ s/^\s*(\d+\.\d+).*/$1/;  # drop sub-sub-version: 2.5.1 -> 2.5
 
 if ($] < 5.004) {
 	print "\n*** You are using an old version of Perl. ***\n\a";

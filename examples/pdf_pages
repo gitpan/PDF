@@ -38,7 +38,7 @@ sub do_the_dirty_job_on {
   my $PDFfile = PDF->new($file);
 
   if ($PDFfile->IsaPDF) {
-  $verbose ? print "File $file has ",$PDFfile->Pages," pages\n" 
+  $verbose ? print "File $file has ",$PDFfile->Pages," page",$PDFfile->Pages > 1 ? "s" :"","\n" 
 	   : print $file,":",$PDFfile->Pages,"\n" ;
   } else {
     $verbose && print "File $file isn't a PDF file\n";
