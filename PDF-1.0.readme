@@ -1,0 +1,30 @@
+Proposed Module List Entry:
+
+PDF        adpO  Generate reports from various logfiles
+
+The PDF library is a proposed library for access the information 
+contained inside a PDF file. It is at its early development stage and
+a lot of work is necessary, but it works also with this few lines
+of code ( see the examples directory ). 
+
+Here are some examples of what it can do:
+
+Install as usual with:
+
+        perl Makefile.PL
+        make
+        make install
+
+Then, you can try the two script in the example directory that tests 
+if a file is a PDF ( not looking at the .pdf extension :-) and the PDF 
+version used to write them.
+
+Enjoy
+
+Antonio "Antro" Rosella 
+
+<antro@technologist.com> 
+<anface@yahoo.com> 
+<anface@geocities.com> 
+<Antonio.Rosella@agip.it>
+
