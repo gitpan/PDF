@@ -1,5 +1,5 @@
 #
-# PDF::Core.pm, version 1.06 Sep 1998 antro
+# PDF::Core.pm, version 1.07 Oct 1998 antro
 #
 # Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
 #
@@ -8,7 +8,7 @@
 
 package PDF::Core;
 
-$PDF::Core::VERSION = "1.06";
+$PDF::Core::VERSION = "1.07";
 
 require 5.004;
 use Carp;
@@ -41,7 +41,6 @@ my %PDF_Fields = (
    Updated => 0, 
 );
 
-  $/="\r";
   my $that = shift;
   my $class=ref($that) || $that ;
   my $self = \%PDF_Fields ;
@@ -58,6 +57,31 @@ sub DESTROY {
 #
   my $self = shift;
   close ( $self->{File_Handler} ) if $self->{File_Handler} ;
+}
+
+
+sub PDFGetline {
+    my $fd = shift;
+    my $offset=shift;
+
+    my $buffer;
+    my $endflag=1;
+
+    binmode $fd;
+    seek $fd, $$offset, 0;
+
+    read($fd,$buffer,2);
+    $buffer =~ s/^\r?\n?// ;
+
+    $$offset +=2;
+
+    while ($endflag) {
+      read($fd,$_,1);
+      $$offset++;
+      $endflag = 0 if ( $_ eq "\r" || $_ eq "\n");
+      $buffer = $buffer . $_ ;
+    }
+    return $buffer;
 }
 
 1;

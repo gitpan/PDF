@@ -1,4 +1,4 @@
-New Release: 1.06
+New Release: 1.07
 
 Name           DSLI  Description                                  Info
 -----------    ----  -------------------------------------------- -----
@@ -25,7 +25,10 @@ A Perl distribution :-)
 
 NEWS:
 
-DOS bug-fix, it now should work 
+The library is now able to deal correctly with the cross-platform
+PDF standard, i.e. PDF generated on a Mac can be correctly read on a
+Unix, for example.  It was a problem partially covered by the previous 
+release but still not correctly handled.
 
 AVAILABILITY:
 

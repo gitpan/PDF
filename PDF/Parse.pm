@@ -1,5 +1,5 @@
 #
-# PDF::Parse.pm, version 1.06 Sep 1998 antro
+# PDF::Parse.pm, version 1.07 Oct 1998 antro
 #
 # Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
 #
@@ -8,7 +8,7 @@
 
 package PDF::Parse;
 
-$PDF::Parse::VERSION = "1.06";
+$PDF::Parse::VERSION = "1.07";
 
 require 5.004;
 require PDF::Core;
@@ -21,42 +21,47 @@ use Exporter ();
 @EXPORT_OK = qw( GetInfo TargetFile Pages PageSize PageRotation);
 
 sub ReadCrossReference_pass1 {
-    my $fd = shift;
-    my $offset=shift;
-    my $self=shift;
+  my $fd = shift;
+  my $offset=shift;
+  my $self=shift;
 
-    my $initial_number;
-    my $obj_counter=0;
-    my $global_obj_counter=0;
-    my $buf;
+  my $initial_number;
+  my $obj_counter=0;
+  my $global_obj_counter=0;
+  my $buf;
 
-    seek $fd, $offset, 0;
-    $_=<$fd>;
-    die "Can't read cross-reference section, according to trailer\n" if ! /xref\r?\n?/  ;
-    while (<$fd>) {
-      s/^\n//;
-      last if /^trailer\r?\n?/ ;
+  binmode $fd;
+
+  $_=PDF::Core::PDFGetline ($fd,\$offset);
+
+  die "Can't read cross-reference section, according to trailer\n" if ! /xref\r?\n?/  ;
+
+  while () {
+    $_=PDF::Core::PDFGetline ($fd,\$offset);
+    s/^\n//;
+    s/^\r//;
+    last if /^trailer\r?\n?/ ;
 #
 # An Object
 #
-      /^\d+\s+\d+\s+n\r?\n?/ && do { my $buf =$_;
-		       my $ind = $initial_number + ($obj_counter++);
-		       $self->{Objects}[$ind] >= 0 && 
-			  do { $self->{Objects}[$ind] = int substr($buf,0,10);
-			       $self->{Gen_Num}[$ind] = int substr($buf,11,5);
-			     };
-		       $_=$buf;
-		       s/^.{18}//; 
-		       next ;
-     }; 
+    /^\d+\s+\d+\s+n\r?\n?/ && do { my $buf =$_;
+	       my $ind = $initial_number + ($obj_counter++);
+	       $self->{Objects}[$ind] >= 0 && 
+		  do { $self->{Objects}[$ind] = int substr($buf,0,10);
+		       $self->{Gen_Num}[$ind] = int substr($buf,11,5);
+		     };
+	       $_=$buf;
+	       s/^.{18}//; 
+	       next ;
+   }; 
 #
 # A Freed Object
 #
-      /^\d+\s+\d+\s+f\r?\n?/ && do { my $buf =$_;
-      		       my $objects_generation_nr = substr($buf,11,5);
-		       my $Num=substr($buf,0,10);
-		       my $ind = $initial_number + ($obj_counter++);
-		       # $ind = $ind . "_" . $objects_generation_nr;
+    /^\d+\s+\d+\s+f\r?\n?/ && do { my $buf =$_;
+   	       my $objects_generation_nr = substr($buf,11,5);
+	       my $Num=substr($buf,0,10);
+	       my $ind = $initial_number + ($obj_counter++);
+	       # $ind = $ind . "_" . $objects_generation_nr;
 		       $self->{Objects}[$ind] = - $Num;
 		       $self->{Gen_Num}[$ind] = $objects_generation_nr;
 		       $_=$buf;
@@ -66,21 +71,24 @@ sub ReadCrossReference_pass1 {
 #
 # A subsection
 #
-      /^\d+\s+\d+\r?\n?/  && do { 
- 	 my $buf = $_ ; 
+    /^\d+\s+\d+\r?\n?/  && do { 
+ 	my $buf = $_ ; 
  	 $initial_number = $buf; 
  	 $initial_number=~ s/^(\d+)\s+\d+\r?\n?.*/$1/; 
 	 $global_obj_counter += $obj_counter;
  	 $obj_counter=0; 
 	 next ;
-      };
+    };
   }
 
   $global_obj_counter +=$obj_counter;
 #
 # Now the trailer for updates 
 #
-while(<$fd>) {
+  while () {
+    $_=PDF::Core::PDFGetline ($fd,\$offset);
+    s/^\n//;
+    s/^\r//;
     last if /startxref\r?\n?/ ;
     /Size\s*\d+\r?\n?/ && do { s/\/Size\s*(\d+)\r?\n?/$1/;
 		   if ( ! $self->{Cross_Reference_Size}) {
@@ -114,9 +122,14 @@ sub ReadCrossReference_pass2 {
   my $self=shift;
 
   seek $fd, $offset, 0;
-  $_=<$fd>;
+  $_=PDF::Core::PDFGetline ($fd,\$offset);
 
-  while(<$fd>) {
+  die "Can't read cross-reference section, according to trailer\n" if ! /xref\r?\n?/  ;
+
+  while() {
+    $_=PDF::Core::PDFGetline ($fd,\$offset);
+    s/^\n//;
+    s/^\r//;
     last if /startxref\r?\n?/ ;
     /Size/ && next;
     /Root/ && next;
@@ -152,9 +165,14 @@ sub ReadInfo {
 
   my ($ro, $gen ) = split(" ",$info_obj);
   my $ro_gen=$self->{Gen_Num}[$ro];
-  seek $fd, $self->{Objects}[$ro] ,0 ;
+  my $offset = $self->{Objects}[$ro] ,0 ;
+  seek $fd, $offset ,0 ;
   my $readinfo_buffer;
-  while (<$fd>) {
+  while () {
+    $_=PDF::Core::PDFGetline ($fd,\$offset);
+
+    last if />>\r?\n?/ ;
+
     /\\\r?\n?$/ && do { s/\\\r?\n?//;
 		  $readinfo_buffer = $readinfo_buffer . $_;
 		  next;
@@ -165,7 +183,7 @@ sub ReadInfo {
       $_=$readinfo_buffer;
       $readinfo_buffer="";
     }
-    /\/Author/ && do { if ( s/\/Author\s*\(([^\)]+)\)\r?\n?/$1/ ) {
+    /\/Author/ && do { if ( s/\/Author\s*\(([^\)]*)\)\r?\n?/$1/ ) {
 		         $self->{Author} = $_ if (!($self->{Author}));
 		       } else {
 			 s/\r?\n?$//;
@@ -173,15 +191,15 @@ sub ReadInfo {
 		       }
 		       next;
                      };
-    /\/CreationDate/ && do { s/\/CreationDate\s\(([^\)]+)\)\r?\n?/$1/;
+    /\/CreationDate/ && do { s/\/CreationDate\s\(([^\)]*)\)\r?\n?/$1/;
   		             $self->{CreationDate} = $_ if (!($self->{CreationDate}));
 		             next;
 		           };
-    /\/ModDate/ && do { s/\/ModDate\s\(([^\)]+)\)\r?\n?/$1/;
+    /\/ModDate/ && do { s/\/ModDate\s\(([^\)]*)\)\r?\n?/$1/;
 		        $self->{ModDate} = $_ if (!($self->{ModDate}));
 		        next;
 		      };
-    /\/Creator/ && do { if ( s/\/Creator\s\(([^\)]+)\)\r?\n?/$1/ ) {
+    /\/Creator/ && do { if ( s/\/Creator\s\(([^\)]*)\)\r?\n?/$1/ ) {
 		          $self->{Creator} = $_ if (!($self->{Creator}));
 		        } else {
 		 	  s/\r?\n?$//;
@@ -189,7 +207,7 @@ sub ReadInfo {
 		        }
 		        next;
 		      };
-    /\/Producer/ && do { if ( s/\/Producer\s\(([^\)]+)\)\r?\n?/$1/) {
+    /\/Producer/ && do { if ( s/\/Producer\s\(([^\)]*)\)\r?\n?/$1/) {
 		           $self->{Producer} = $_ if (!($self->{Producer}));
 		         } else {
 		 	   s/\r?\n?$//;
@@ -197,7 +215,7 @@ sub ReadInfo {
 		         }
 		         next;
 		       };
-    /\/Title/ && do { if ( s/\/Title\s\(([^\)]+)\)\r?\n?/$1/) {
+    /\/Title/ && do { if ( s/\/Title\s\(([^\)]*)\)\r?\n?/$1/) {
 		        $self->{Title} = $_ if (!($self->{Title}));
 		      } else {
 		        s/\r?\n?$//;
@@ -205,7 +223,7 @@ sub ReadInfo {
 		      }
 		      next;
 		    };
-    /\/Subject/ && do { if ( s/\/Subject\s\(([^\)]+)\)\r?\n?/$1/) {
+    /\/Subject/ && do { if ( s/\/Subject\s\(([^\)]*)\)\r?\n?/$1/) {
 		          $self->{Subject} = $_ if (!($self->{Subject}));
 		        } else {
 		          s/\r?\n?$//;
@@ -213,7 +231,7 @@ sub ReadInfo {
 		        }
 		       next;
 		    };
-    /\/Keywords/ && do { if ( s/\/Keywords\s\(([^\)]+)\)\r?\n?/$1/) {
+    /\/Keywords/ && do { if ( s/\/Keywords\s\(([^\)]*)\)\r?\n?/$1/) {
 		           $self->{Keywords} = $_ if (!($self->{Keywords}));
 		         } else {
 		           s/\r?\n?$//;
@@ -221,7 +239,6 @@ sub ReadInfo {
 		         }
 		         next;
 		    };
-    last if />>\r?\n?/ ;
   }
 }
 

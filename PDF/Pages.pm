@@ -1,5 +1,5 @@
 #
-# PDF::Pages.pm, version 1.06 Sep 1998 antro
+# PDF::Pages.pm, version 1.07 Oct 1998 antro
 #
 # Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
 #
@@ -8,7 +8,7 @@
 
 package PDF::Pages;
 
-$PDF::Pages::VERSION = "1.06";
+$PDF::Pages::VERSION = "1.07";
 
 require 5.004;
 require PDF::Core;
@@ -31,7 +31,6 @@ my %PDF_Pages = (
    Rotate => 0,
 );
 
-  $/="\r";
   my $that = shift;
   my $class=ref($that) || $that ;
   my $self = \%PDF_Pages ;
@@ -51,11 +50,13 @@ sub ReadPageTree {
     my $ro = $pdf_struct->{Root_Object};
     $ro =~ s/(\d+)\s+\d+/$1/;
     my $ro_gen=$pdf_struct->{Gen_Num}[$ro];
-    seek FILE, $pdf_struct->{Objects}[$ro] ,0 ;
+    my $offset= $pdf_struct->{Objects}[$ro] ;
+    
 #
 # At start of Catalog
 #
-    while (<FILE>) {
+    while () {
+      $_=PDF::Core::PDFGetline (\*FILE,\$offset);
       next if /$ro\s+$ro_gen\s+obj\r?\n?/ ; 
       next if /<<\r?\n?/  ;
       /\/Pages/ && do { s/\r?\n?\/Pages\s+(\d+)\s+(\d+)\s+R\r?\n?/$1 $2/;
@@ -63,7 +64,8 @@ sub ReadPageTree {
 		      my ($ind,$gen)=split(" ",$pdf_struct->{Catalog}->{Pages});
 		      $pdf_struct->{Gen_Num}[$ind] != $gen && die "Can't find Pages Node\n";
 		      $old_seek = tell FILE;
-                      $self->ReadPage(\*FILE, $pdf_struct->{Objects}[$ind], 0 );
+                      my $temp_offset=$pdf_struct->{Objects}[$ind];
+                      $self->ReadPage(\*FILE, $temp_offset, 0 );
 		      seek FILE, $old_seek, 0 ;
 		      next;
 		    };
@@ -87,8 +89,8 @@ sub ReadPage {
 
     seek $fd, $offset, 0;
 
-    $_=<$fd>;
-    while(<$fd>) {
+    while() {
+      $_=PDF::Core::PDFGetline ($fd,\$offset);
       next if /<</ ;
       /^\/Type\s+/ && do { croak " Page tree corrupted!\n" if !(/\/Page/ ); next; }; 
       /\/Count\s+/ && do { s/\n?\r?\/Count\s+(\d+)\s*\r?\n?/$1/; 
