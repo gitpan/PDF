@@ -1,0 +1,392 @@
+#
+# PDF::Parse.pm, version 1.04 Feb 1998 antro
+#
+# Copyright (c) 1998 Antonio Rosella Italy
+#
+# Free usage under the same Perl Licence condition.
+#
+
+package PDF::Parse;
+
+$PDF::Parse::VERSION = "1.04";
+
+require 5.004;
+require PDF::Core;
+
+use Carp;
+use Exporter ();
+
+#
+# Verbose off by default
+#
+
+@ISA = qw(Exporter PDF::Core);
+
+@EXPORT_OK = qw( GetInfo TargetFile Pages );
+
+sub ReadCrossReference_pass1 {
+    my $fd = shift;
+    my $offset=shift;
+    my $self=shift;
+
+    my $initial_number;
+    my $obj_counter=0;
+    my $global_obj_counter=0;
+    my $buf;
+    my $first_level;
+
+    seek $fd, $offset, 0;
+    $_=<$fd>;
+    die "Can't read cross-reference section, according to trailer\n" if ! /xref\r?\n?/  ;
+    while (<$fd>) {
+      s/^\n//;
+      last if /^trailer\r?\n?/ ;
+#
+# An Object
+#
+      /^\d+\s+\d+\s+n\r?\n?/ && do { my $buf =$_;
+		       my $ind = $initial_number + ($obj_counter++);
+		       $self->{Objects}[$ind] >= 0 && 
+			  do { $self->{Objects}[$ind] = int substr($buf,0,10);
+			       $self->{Gen_Num}[$ind] = int substr($buf,11,5);
+			     };
+		       $_=$buf;
+		       s/^.{18}//; 
+		       next ;
+     }; 
+#
+# A Freed Object
+#
+      /^\d+\s+\d+\s+f\r?\n?/ && do { my $buf =$_;
+      		       my $objects_generation_nr = substr($buf,11,5);
+		       my $Num=substr($buf,0,10);
+		       my $ind = $initial_number + ($obj_counter++);
+		       # $ind = $ind . "_" . $objects_generation_nr;
+		       $self->{Objects}[$ind] = - $Num;
+		       $self->{Gen_Num}[$ind] = $objects_generation_nr;
+		       $_=$buf;
+		       s/^.{18}//; 
+		       next ;
+     };
+#
+# A subsection
+#
+      /^\d+\s+\d+\r?\n?/  && do { 
+ 	 my $buf = $_ ; 
+ 	 $initial_number = $buf; 
+ 	 $initial_number=~ s/^(\d+)\s+\d+\r?\n?.*/$1/; 
+	 $global_obj_counter += $obj_counter;
+ 	 $obj_counter=0; 
+	 next ;
+      };
+  }
+
+  $global_obj_counter +=$obj_counter;
+#
+# Now the trailer for updates 
+#
+while(<$fd>) {
+    last if /startxref\r?\n?/ ;
+    /Size\s*\d+\r?\n?/ && do { s/\/Size\s*(\d+)\r?\n?/$1/;
+		   if ( ! $self->{Cross_Reference_Size}) {
+		     $self->{Cross_Reference_Size} = $_ ;
+		     $first_level=1;
+		   }
+		   next;} ;
+    /Root/ && do { s/\/Root\s+(\d+\s+\d+)\s+R\r?\n?/$1/;
+		   if ( ! $self->{Root_Object}) {
+		     $self->{Root_Object}=$_;
+		   }
+		   next;
+		 };
+    /Info/ && next;
+    /ID/ && next;
+    /Encrypt/ && next;
+    /Prev/ && do {  
+		   s/\/Prev\s*(\d+)\r?\n?/$1/;
+    		   $self->{Updated}=1;
+		   my $old_seek = tell $fd;
+		   $global_obj_counter += ReadCrossReference_pass1($fd,$_, $self );
+		   seek $fd, $old_seek, 0;
+		   if ($first_level ) {
+			$self->{Cross_Reference_Size} != $global_obj_counter &&
+			  warn "Cross-reference table corrupted! $global_obj_counter objects read, $self->{Cross_Reference_Size} requested \n";
+		   }
+		   next;
+		 };
+  }
+  return $global_obj_counter;
+}
+
+sub ReadCrossReference_pass2 {
+  my $fd = shift;
+  my $offset=shift;
+  my $self=shift;
+
+  seek $fd, $offset, 0;
+  $_=<$fd>;
+  while (<$fd>) {
+    last if /^trailer\r?\n?/ ;
+  }
+
+  while(<$fd>) {
+    last if /startxref\r?\n?/ ;
+    /Size/ && next;
+    /Root/ && next;
+    /Info/ && do { 
+		   s/\/Info\s+(\d+\s+\d+\s+R)\r?\n?/$1/;
+		   my $old_seek = tell $fd;
+		   ReadInfo($fd, $self ,$_);
+		   seek $fd, $old_seek, 0;
+		   next;
+		 };
+    /ID/ && do { 
+		 $PDF::Verbose && warn "ID! Not yet implemented :-(\n";
+		 next;
+	       };
+    /Encrypt/ && do { 
+		   $PDF::Verbose && warn "Encrypt! Not yet implemented :-(\n";
+		   next;
+		 };
+    /Prev/ && do { 
+		   s/\/Prev\s*(\d+)\r?\n?/$1/;
+		   my $old_seek = tell $fd;
+		   ReadCrossReference_pass2($fd,$_, $self );
+		   seek $fd, $old_seek, 0;
+		   next;
+		 };
+  }
+}
+
+sub ReadInfo {
+  my $fd = shift;
+  my $self = shift;
+  my $info_obj=shift;
+
+  my ($ro, $gen ) = split(" ",$info_obj);
+  my $ro_gen=$self->{Gen_Num}[$ro];
+  seek $fd, $self->{Objects}[$ro] ,0 ;
+  while (<$fd>) {
+    /\/Author/ && do { s/\/Author\s\(([^\)]+)\)\r?\n?/$1/;
+		       $self->{Author} = $_ if (!($self->{Author}));
+                     };
+    /\/CreationDate/ && do { s/\/CreationDate\s\(([^\)]+)\)\r?\n?/$1/;
+		       $self->{CreationDate} = $_ if (!($self->{CreationDate}));
+		    };
+    /\/ModDate/ && do { s/\/ModDate\s\(([^\)]+)\)\r?\n?/$1/;
+		       $self->{ModDate} = $_ if (!($self->{ModDate}));
+		    };
+    /\/Creator/ && do { s/\/Creator\s\(([^\)]+)\)\r?\n?/$1/;
+		       $self->{Creator} = $_ if (!($self->{Creator}));
+		    };
+    /\/Producer/ && do { s/\/Producer\s\(([^\)]+)\)\r?\n?/$1/;
+		       $self->{Producer} = $_ if (!($self->{Producer}));
+		    };
+    /\/Title/ && do { s/\/Title\s\(([^\)]+)\)\r?\n?/$1/;
+		       $self->{Title} = $_ if (!($self->{Title}));
+		    };
+    /\/Subject/ && do { s/\/Subject\s\(([^\)]+)\)\r?\n?/$1/;
+		       $self->{Subject} = $_ if (!($self->{Subject}));
+		    };
+    /\/Keywords/ && do { s/\/Keywords\s\(([^\)]+)\)\r?\n?/$1/;
+		       $self->{Keywords} = $_ if (!($self->{Keywords}));
+		    };
+    last if />>\r?\n?/ ;
+
+  }
+}
+
+sub TargetFile {
+  my $self = shift;
+  my $file = shift;
+
+  croak "Already linked to the file ",$self->{File_Name},"\n" if $self->{File_Name} ;
+  
+  my $offset;
+
+  if ( $file ) {
+    open(FILE, "< $file") or croak "can't open $file: $!";
+    $self->{File_Name} = $file ;
+    $self->{File_Handler} = \*FILE;
+    my $buf;
+    read(FILE,$buf,4);
+    if ( $buf ne "%PDF" ) {
+     print "File $_[0] is not PDF compliant !\n" if $PDF::Verbose ;
+     return 0 ;
+    }
+    read(FILE,$buf,4);
+    $buf =~ s/-//;
+    $self->{Header}= $buf;
+#
+# Attempt for endline
+#
+    read(FILE,$_,1);
+    $/ = "\r" if /\r/ ;
+    read(FILE,$_,1);
+    $/ = "\n" if /\n/ ;
+
+    seek FILE,-50,2;
+    read( FILE, $offset, 50 );
+    $offset =~ s/[^s]*startxref\r?\n?(\d*)\r?\n?%%EOF\r?\n?/$1/;
+
+    ReadCrossReference_pass1(\*FILE, $offset, $self );
+    ReadCrossReference_pass2(\*FILE, $offset, $self );
+
+    $self->{File_Handler} = \*FILE;
+    return 1;
+  } else {
+    croak "I need a file name (!)";
+  }
+}
+
+sub GetInfo {
+  my $self = shift;
+  $_ = shift;
+
+  croak "PDF File not specified !\n" if ! $self->{File_Name}  ; 
+
+  /Author/ && return $self->{Author}; 
+  /CreationDate/ && return $self->{CreationDate}; 
+  /ModDate/ && return $self->{ModDate}; 
+  /Creator/ && return $self->{Creator}; 
+  /Producer/ && return $self->{Producer}; 
+  /Title/ && return $self->{Title}; 
+  /Subject/ && return $self->{Subject}; 
+  /Keywords/ && return $self->{Keywords}; 
+
+# SWITCH: { 
+#     last SWITCH;
+#   }
+     
+}
+
+sub Pages {
+  my $self = shift;
+
+  croak "PDF File not specified !\n" if ! $self->{File_Name}  ; 
+  $self->{PageTree}->ReadPageTree($self) if ! $self->{PageTree}->{Count};
+  return $self->{PageTree}->{Count};
+}
+
+1;
+__END__
+
+=head1 NAME
+
+PDF::Parse - Library for parsing a PDF file
+
+=head1 SYNOPSIS
+
+  use PDF::Parse;
+
+  $pdf=PDF::Parse->new ;
+  $pdf=PDF::Parse->new(filename);
+
+  $result=$pdf->TargetFile( filename );
+
+  print "is a pdf file\n" if ( $pdf->IsaPDF ) ;
+  print "Has ",$pdf->Pages," Pages \n";
+  print "Use a PDF Version  ",$pdf->Version ," \n";
+
+  print "filename with title",$pdf->GetInfo("Title"),"\n";
+  print "and with subject ",$pdf->GetInfo("Subject"),"\n";
+  print "was written by ",$pdf->GetInfo("Author"),"\n";
+  print "in date ",$pdf->GetInfo("CreationDate"),"\n";
+  print "using ",$pdf->GetInfo("Creator"),"\n";
+  print "and converted with ",$pdf->GetInfo("Producer"),"\n";
+  print "The last modification occurred ",$pdf->GetInfo("ModDate"),"\n";
+  print "The associated keywords are ",$pdf->GetInfo("Keywords"),"\n";
+
+=head1 DESCRIPTION
+
+The main purpose of the PDF library is to provide classes and functions 
+that allow to read and manipulate PDF files with perl. PDF stands for
+Portable Document Format and is a format proposed by Adobe. For
+more details abour PDF, refer to:
+
+B<http://www.adobe.com/> 
+
+For a detailed documentation, see the PDF library.
+
+The library is at is very beginning of development. 
+The main idea is to provide some "basic" modules for access 
+the information contained in a PDF file. Even if at this
+moment is in an early development stage, the three little 
+scripts provided with the library ( B<is_pdf>, B<pdf_version>, and 
+B<pdf_pages> ) show that it is usable. 
+
+B<is_pdf> script test a list of files in order divide the PDF file
+from the non PDF using the info provided by the files 
+themselves. It doesn't use the I<.pdf> extension, it uses the information
+contained in the file.
+
+B<pdf_version> returns the PDF level used for writing a file.
+
+B<pdf_pages> gives the number of pages of a PDF file. 
+
+=head1 Constructor
+
+=over 4
+
+=item B<new ( [ filename ] )>
+
+This is the constructor of a new PDF object. If the filename is missing, it returns an
+empty PDF descriptor ( can be filled with $pdf->TargetFile). Otherwise, It acts as the
+B<TargetFile> method.
+
+=back
+
+=head1 Methods
+
+The available methods are :
+
+=over 4
+
+=item B<TargetFile ( filename ) >
+
+This method links the filename to the pdf descriptor and check the header.
+
+=item B<Version>
+
+Returns the PDF version used for writing the object file.
+
+=item B<Pages>
+
+Returns the number of pages of the object file. As side effect, 
+the PDF object contains part of the Catalog structure after 
+the call ( more specifically, part of the Root Page ).
+
+=back
+
+=head1 Variables
+
+There are 2 variables that can be accessed:
+
+=over 4
+
+=item B<$PDF::VERSION>
+
+Contain the version of the library installed
+
+=item B<$PDF::Verbose>
+
+This variable is false by default. Change the value if you want 
+more verbose output messages from library
+
+=back 4
+
+=head1 Copyright
+
+  Copyright 1998, Antonio Rosella antro@technologist.com
+
+This library is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+
+=head1 Availability
+
+The latest version of this library is likely to be available from:
+
+http://www.geocities.com/CapeCanaveral/Hangar/4794/
+
+=cut
+

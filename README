@@ -1,15 +1,14 @@
-Proposed Module List Entry:
+New Release: 1.04
 
-PDF        adpO  Access information in a PDF file
+Name           DSLI  Description                                  Info
+-----------    ----  -------------------------------------------- -----
+PDF            bdpO  Access information in a PDF file             ANTRO
 
 The PDF library is a proposed library for access the information 
-contained inside a PDF file. It is at its early development stage and
-a lot of work is necessary, but it works also with this few lines
-of code ( see the examples directory ). 
+contained inside a PDF file. PDF stands for Portable Document Format and is
+a standard proposed by Adobe ( See http://www.adobe.com/ for more details ) .
 
-Here are some examples of what it can do:
-
-Install as usual with:
+Install "as usual" with:
 
         perl Makefile.PL
         make
@@ -17,13 +16,32 @@ Install as usual with:
 
 Then, you can try the scripts in the example directory that tests 
 if a file is a PDF ( not looking at the .pdf extension :-), the PDF 
-version used to write them and their number of pages.
+version used to write them, their number of pages and the various 
+Info ( Author, Creation date, etc. ).
+
+NEWS:
+
+The library is now splitted in several files:
+
+PDF  
+PDF::Core  
+PDF::Pages  
+PDF::Parse
+
+for a better developing.
+
+The Info Dictionary is now accessible ( Author, Title, Creator, etc. )
+
+The library is available at 
+
+<http://www.geocities.com/CapeCanaveral/Hangar/4794/>
+
+and at all CPAN mirror 
 
 Enjoy
 
 Antonio "Antro" Rosella 
-<http://www.geocities.com/CapeCanaveral/Hangar/4794/>
 
-<antro@technologist.com> 
 <anface@yahoo.com> 
 <anface@geocities.com> 
+<antro@technologist.com> 
