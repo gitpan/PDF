@@ -7,8 +7,6 @@ contained inside a PDF file. It is at its early development stage and
 a lot of work is necessary, but it works also with this few lines
 of code ( see the examples directory ). 
 
-Here are some examples of what it can do:
-
 Install as usual with:
 
         perl Makefile.PL
@@ -27,4 +25,3 @@ Antonio "Antro" Rosella
 <anface@yahoo.com> 
 <anface@geocities.com> 
 <Antonio.Rosella@agip.it>
-
