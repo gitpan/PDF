@@ -1,4 +1,4 @@
-New Release: 1.09
+New Release: 1.10
 
 Name           DSLI  Description                                  Info
 -----------    ----  -------------------------------------------- -----
@@ -25,17 +25,17 @@ A Perl distribution :-)
 
 NEWS:
 
-Added support for crypted PDF. The library can now check 
-if the parsed PDF has some kind of crypting.
+Added some support for iso character.
 
-I've also tested the library with the new PDF version ( 1.3 ) 
-and it works correctly.
+Correct page counter of updated files. 
+
+ReadInfo bug fix
 
 AVAILABILITY:
 
 The library is available at 
 
-<http://www.geocities.com/CapeCanaveral/Hangar/4794/>
+<http://www.sanface.com/>
 
 and at all CPAN mirror 
 
@@ -43,6 +43,5 @@ Enjoy
 
 Antonio "Antro" Rosella 
 
-<anface@yahoo.com> 
-<anface@geocities.com> 
-<antro@technologist.com> 
+<sanface@sanface.com> 
+<antro@tiscalinet.it> 

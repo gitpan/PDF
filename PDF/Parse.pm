@@ -1,14 +1,14 @@
 #
-# PDF::Parse.pm, version 1.09 March 1999 antro
+# PDF::Parse.pm, version 1.10 November 1999 antro
 #
-# Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
+# Copyright (c) 1998-1999 Antonio Rosella Italy antro@tiscalinet.it
 #
 # Free usage under the same Perl Licence condition.
 #
 
 package PDF::Parse;
 
-$PDF::Parse::VERSION = "1.09";
+$PDF::Parse::VERSION = "1.10";
 
 require 5.004;
 require PDF::Core;
@@ -46,7 +46,7 @@ sub ReadCrossReference_pass1 {
 #
     /^\d+\s+\d+\s+n\r?\n?/ && do { my $buf =$_;
 	       my $ind = $initial_number + ($obj_counter++);
-	       $self->{Objects}[$ind] >= 0 && 
+               ( not defined $self->{Objects}[$ind] )&& 
 		  do { $self->{Objects}[$ind] = int substr($buf,0,10);
 		       $self->{Gen_Num}[$ind] = int substr($buf,11,5);
 		     };
@@ -191,6 +191,7 @@ sub ReadInfo {
     }
     $a.=$_;
     $_=$a;
+
     /\\\r?\n?$/ && do { s/\\\r?\n?//;
 		  $readinfo_buffer = $readinfo_buffer . $_;
 		  next;
@@ -201,61 +202,73 @@ sub ReadInfo {
       $_=$readinfo_buffer;
       $readinfo_buffer="";
     }
-    /\/Author/ && do { if ( s/\/Author\s*\(([^\)]*)\)\r?\n?/$1/ ) {
-		         $self->{Author} = $_ if (!($self->{Author}));
+#
+# Courtesy of Ross Moore
+#
+    my $str;
+    /\/Author/ && do { if ( s/\/Author\s*\(((\\\)|[^\)])*)\)\r?\n?/$1/ ) {
+                       $str=$1; $str =~ s/\\([()])/$1/g;
+                       $self->{Author} = $str if (!($self->{Author}));
 		       } else {
 			 s/\r?\n?$//;
 			 $readinfo_buffer = $_;
 		       }
-		       next;
+#		       next;
                      };
-    /\/CreationDate/ && do { s/\/CreationDate\s\(([^\)]*)\)\r?\n?/$1/;
-  		             $self->{CreationDate} = $_ if (!($self->{CreationDate}));
-		             next;
+    /\/CreationDate/ && do { s/\/CreationDate\s\(((\\\)|[^\)])*)\)\r?\n?/$1/;
+                             $str=$1; $str =~ s/\\([()])/$1/g;
+                             $self->{CreationDate} = $str if (!($self->{CreationDate}));
+#		             next;
 		           };
-    /\/ModDate/ && do { s/\/ModDate\s\(([^\)]*)\)\r?\n?/$1/;
-		        $self->{ModDate} = $_ if (!($self->{ModDate}));
-		        next;
+    /\/ModDate/ && do { s/\/ModDate\s\(((\\\)|[^\)])*)\)\r?\n?/$1/;
+                        $str=$1; $str =~ s/\\([()])/$1/g;
+                        $self->{ModDate} = $str if (!($self->{ModDate}));
+#		        next;
 		      };
-    /\/Creator/ && do { if ( s/\/Creator\s\(([^\)]*)\)\r?\n?/$1/ ) {
-		          $self->{Creator} = $_ if (!($self->{Creator}));
+    /\/Creator/ && do { if ( s/\/Creator\s\(((\\\)|[^\)])*)\)\r?\n?/$1/ ) {
+                          $str=$1; $str =~ s/\\([()])/$1/g;
+                          $self->{Creator} = $str if (!($self->{Creator}));
 		        } else {
 		 	  s/\r?\n?$//;
 			  $readinfo_buffer = $_;
 		        }
-		        next;
+#		        next;
 		      };
-    /\/Producer/ && do { if ( s/\/Producer\s\(([^\)]*)\)\r?\n?/$1/) {
-		           $self->{Producer} = $_ if (!($self->{Producer}));
+    /\/Producer/ && do { if ( s/\/Producer\s\(((\\\)|[^\)])*)\)\r?\n?/$1/) {
+                           $str=$1; $str =~ s/\\([()])/$1/g;
+                           $self->{Producer} = $str if (!($self->{Producer}));
 		         } else {
 		 	   s/\r?\n?$//;
 			   $readinfo_buffer = $_;
 		         }
-		         next;
+#		         next;
 		       };
-    /\/Title/ && do { if ( s/\/Title\s\(([^\)]*)\)\r?\n?/$1/) {
-		        $self->{Title} = $_ if (!($self->{Title}));
+    /\/Title/ && do { if ( s/\/Title\s\(((\\\)|[^\)])*)\)\r?\n?/$1/) {
+                        $str=$1; $str =~ s/\\([()])/$1/g;
+                        $self->{Title} = $str if (!($self->{Title}));
 		      } else {
 		        s/\r?\n?$//;
 		        $readinfo_buffer = $_;
 		      }
-		      next;
+#		      next;
 		    };
-    /\/Subject/ && do { if ( s/\/Subject\s\(([^\)]*)\)\r?\n?/$1/) {
-		          $self->{Subject} = $_ if (!($self->{Subject}));
+    /\/Subject/ && do { if ( s/\/Subject\s\(((\\\)|[^\)])*)\)\r?\n?/$1/) {
+                          $str=$1; $str =~ s/\\([()])/$1/g;
+                          $self->{Subject} = $str if (!($self->{Subject}));
 		        } else {
 		          s/\r?\n?$//;
 		          $readinfo_buffer = $_;
 		        }
-		       next;
+#		       next;
 		    };
-    /\/Keywords/ && do { if ( s/\/Keywords\s\(([^\)]*)\)\r?\n?/$1/) {
-		           $self->{Keywords} = $_ if (!($self->{Keywords}));
+    /\/Keywords/ && do { if ( s/\/Keywords\s\(((\\\)|[^\)])*)\)\r?\n?/$1/) {
+                           $str=$1; $str =~ s/\\([()])/$1/g;
+                           $self->{Keywords} = $str if (!($self->{Keywords}));
 		         } else {
 		           s/\r?\n?$//;
 		           $readinfo_buffer = $_;
 		         }
-		         next;
+#		         next;
 		    };
   }
 }

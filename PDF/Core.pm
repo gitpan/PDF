@@ -1,7 +1,7 @@
 #
 # PDF::Core.pm, version 1.09 March 1998 antro
 #
-# Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
+# Copyright (c) 1998-1999 Antonio Rosella Italy antro@tiscalinet.it
 #
 # Free usage under the same Perl Licence condition.
 #

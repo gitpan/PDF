@@ -1,14 +1,14 @@
 #
-# PDF.pm, version 1.09 March 1998 antro
+# PDF.pm, version 1.10 November 1999 antro
 #
-# Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
+# Copyright (c) 1998 -1999 Antonio Rosella Italy antro@tiscalinet.it
 #
 # Free usage under the same Perl Licence condition.
 #
 
 package PDF;
 
-$PDF::VERSION = "1.09";
+$PDF::VERSION = "1.10";
 
 require 5.004;
 
@@ -210,6 +210,7 @@ and at any CPAN mirror
 Fabrizio Pivari ( pivari@geocities.com ) for all the suggestions about life, the universe and everything.
 Brad Appleton ( bradapp@enteract.com ) for his suggestions about the module organization.
 Thomas Drillich for the iso latin1 support 
+Ross Moore ( ross@ics.mq.edu.au ) for ReadInfo fix
 
 =cut
 
