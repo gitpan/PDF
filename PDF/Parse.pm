@@ -1,25 +1,70 @@
 #
-# PDF::Parse.pm, version 1.10 November 1999 antro
+# PDF::Parse.pm, version 1.11 February 2000 antro
 #
-# Copyright (c) 1998-1999 Antonio Rosella Italy antro@tiscalinet.it
+# Copyright (c) 1998 - 2000 Antonio Rosella Italy antro@tiscalinet.it, Johannes Blach dw235@yahoo.com 
 #
 # Free usage under the same Perl Licence condition.
 #
 
 package PDF::Parse;
 
-$PDF::Parse::VERSION = "1.10";
+$PDF::Parse::VERSION = "1.11";
 
-require 5.004;
+=pod
+
+=head1 NAME
+
+PDF::Parse - Library with parsing functions for PDF library
+
+=head1 SYNOPSIS
+
+  use PDF::Parse;
+
+  $pdf->TargetFile($filename);
+  $pdf->LoadPageInfo;
+
+  $version = $pdf->Version;
+  $bool = $pdf->IsaPDF;
+  $bool = $pdf->IscryptPDF;
+
+  $info = $pdf->GetInfo ($key);
+  $pagenum = $pdf->Pages;
+
+  @size = $pdf->PageSize ($page);
+  # or
+  @size = $pdf->PageSize;
+
+  $rotation = $pdf->PageRotation ($page);
+  # or
+  $rotation = $pdf->PageRotation;
+
+=head1 DESCRIPTION
+
+The main purpose of the PDF::Parse library is to provide parsing functions
+for the more general PDF library.
+
+=head1 Methods
+
+The available methods are:
+
+=cut
+
+require 5.005;
 require PDF::Core;
 
+use strict;
 use Carp;
 use Exporter ();
 
+use vars qw(@ISA @EXPORT_OK);
+
 @ISA = qw(Exporter PDF::Core);
 
-@EXPORT_OK = qw( GetInfo TargetFile Pages PageSize PageRotation);
+@EXPORT_OK = qw( LoadPageInfo GetInfo TargetFile
+				 Pages PageSize PageRotation IsaPDF
+				 Version IscryptPDF );
 
+#################################################################
 sub ReadCrossReference_pass1 {
   my $fd = shift;
   my $offset=shift;
@@ -40,7 +85,7 @@ sub ReadCrossReference_pass1 {
     $_=PDF::Core::PDFGetline ($fd,\$offset);
     s/^\n//;
     s/^\r//;
-    last if /^trailer\r?\n?/ ;
+    last if (m/\btrailer\b/) ;
 #
 # An Object
 #
@@ -85,199 +130,140 @@ sub ReadCrossReference_pass1 {
 #
 # Now the trailer for updates 
 #
-  while () {
-    $_=PDF::Core::PDFGetline ($fd,\$offset);
-    s/^\n//;
-    s/^\r//;
-    last if /startxref\r?\n?/ ;
-    /Size\s*\d+\r?\n?/ && do { s/\/Size\s*(\d+)\r?\n?/$1/;
-		   if ( ! $self->{Cross_Reference_Size}) {
-		     $self->{Cross_Reference_Size} = $_ ;
-		   }
-		   next;} ;
-    /Root/ && do { s/\/Root\s+(\d+\s+\d+)\s+R\r?\n?/$1/;
-		   if ( ! $self->{Root_Object}) {
-		     $self->{Root_Object}=$_;
-		   }
-		   next;
-		 };
-    /Info/ && next;
-    /ID/ && next;
-    /Encrypt/ && do { s/\/Encrypt\s+(\d+\s+\d+)\s+R\r?\n?/$1/;
-		   if ( ! $self->{Crypt_Object}) {
-		     $self->{Crypt_Object}=$_;
-		   }
-		   next;
-		 };
-    /Prev/ && do {  
-		   s/\/Prev\s*(\d+)\r?\n?/$1/;
-    		   $self->{Updated}=1;
-		   my $old_seek = tell $fd;
-		   $global_obj_counter += ReadCrossReference_pass1($fd,$_, $self );
-		   seek $fd, $old_seek, 0;
-		   next;
-		 };
-  }
+
+#
+# Skip to start of dictionary.
+#
+    until (m/<</)
+		{
+		$_=PDF::Core::PDFGetline ($fd,\$offset);
+		}
+
+#
+# Read the dictionary
+#
+    my %trailer = ( PDF::Core::PDFGetPrimitive ($fd, $offset) );
+
+    if ($self->{"Trailer"}{"/Root"} eq "")
+		{
+		$self->{"Trailer"} = \%trailer;
+		#
+		# This code is here for backward compatibility only. If the content
+		# of the root trailer is needed, use $self->{"Trailer"} instead.
+		#
+		$self->{"Cross_Reference_Size"} = $trailer{"/Size"};
+		$self->{"Root_Object"} = $trailer{"/Root"};
+		$self->{"Crypt_Object"} = $trailer{"/Encrypt"};
+		}
+	if ($trailer{"/Prev"} =~ m/^\d+$/)
+		{  
+  		$self->{"Updated"} = 1;
+		my $old_seek = tell $fd;
+		$global_obj_counter += ReadCrossReference_pass1 ($fd,
+            $trailer{"/Prev"}, $self );
+		seek $fd, $old_seek, 0;
+		}
+
+
   return $global_obj_counter;
 }
 
-sub ReadCrossReference_pass2 {
-  my $fd = shift;
-  my $offset=shift;
-  my $self=shift;
+#################################################################
+sub LoadPageSubtree (\*$;%)
+	{
+	my $self = shift;
+	my $ref = shift;
+	my %inheritance = @_ ;
 
-  seek $fd, $offset, 0;
-  $_=PDF::Core::PDFGetline ($fd,\$offset);
+	my $data = $self->GetObject ($ref);
 
-  die "Can't read cross-reference section, according to trailer\n" if ! /xref\r?\n?/  ;
+	# Check which attributes are inherited. Adobe did not add any new
+	# inherited attributes in version 1.2 or later, so this list is
+	# complete.
 
-  while() {
-    $_=PDF::Core::PDFGetline ($fd,\$offset);
-    s/^\n//;
-    s/^\r//;
-    last if /startxref\r?\n?/ ;
-    /Size/ && next;
-    /Root/ && next;
-    /Info/ && do { 
-		   s/\/Info\s+(\d+\s+\d+\s+R)\r?\n?/$1/;
-		   my $old_seek = tell $fd;
-		   ReadInfo($fd, $self ,$_);
-		   seek $fd, $old_seek, 0;
-		   next;
-		 };
-    /ID/ && do { 
-		 $PDF::Verbose && warn "ID! Not yet implemented :-(\n";
-		 next;
-	       };
-    /Encrypt/ && do { 
-		   $PDF::Verbose && warn "Encrypt! Not yet implemented :-(\n";
-		   next;
-		 };
-    /Prev/ && do { 
-		   s/\/Prev\s*(\d+)\r?\n?/$1/;
-		   my $old_seek = tell $fd;
-		   ReadCrossReference_pass2($fd,$_, $self );
-		   seek $fd, $old_seek, 0;
-		   next;
-		 };
-  }
-}
+	# Do simple values.
+	foreach my $key ("/Rotate", "/Dur", "/Hid", "/Trans", 
+					 "/MediaBox", "/CropBox")
+		{
+		if (defined ($data->{$key}))
+			{
+			# Check if it is an indirect reference
+			if ($data->{$key} =~ m/^\d+ \d+ R$/)
+				{
+				my $dataref = $data->{$key};
+				do
+					{
+					$dataref = $self->GetObject ($dataref);
+					}
+				while ($dataref =~ m/^\d+ \d+ R$/);
 
-sub ReadInfo {
-  my $fd = shift;
-  my $self = shift;
-  my $info_obj=shift;
+				if (UNIVERSAL::isa ($data, "ARRAY"))
+					{
+					$inheritance{$key} = [];
+					foreach my $i (@{$data})
+						{
+						# Each element may be a reference.
+						while ($i =~ m/^\d+ \d+ R$/)
+							{
+							$i = $self->GetObject ($i);
+							}
 
-  my ($ro, $gen ) = split(" ",$info_obj);
-  my $ro_gen=$self->{Gen_Num}[$ro];
-  my $offset = $self->{Objects}[$ro] ,0 ;
-  seek $fd, $offset ,0 ;
-  my $readinfo_buffer;
-  while () {
-    $_=PDF::Core::PDFGetline ($fd,\$offset);
+						push @{$inheritance{$key}}, $i;
+						}
+					}
+				else
+					{
+					$inheritance{$key} = $dataref;
+					}
+				}
+			else
+				{
+				$inheritance{$key} = $data->{$key};
+				}
+			}
+		}
 
-    last if />>\r?\n?/ ;
+	# If this objects contains ressources, replace information in inheritance
+	$inheritance{"Resource_Object"} = $data->{"/Resources"}
+	    if (defined ($data->{"/Resources"}));
 
-#
-# iso chars support, courtesy of T. Drillich
-#
-    my($a,$n)='';
-    while(/(\\\d+)/) {
-       $a.=$`;
-       $_=$';
-       $n=$1;
-       $n=~s/\\//g;
-       $a.=chr(oct($n));
-    }
-    $a.=$_;
-    $_=$a;
+	if ($data->{"/Type"} eq "/Pages")
+		{
+		# It's just an intermediate Node
+		foreach my $kid (@{$data->{"/Kids"}})
+			{
+			$self->LoadPageSubtree ($kid, %inheritance);
+			}
+		}
+	elsif ($data->{"/Type"} eq "/Page")
+		{
+		# We have a real page!
+		$inheritance{"Page_Object"} = $ref;
+		push @{$self->{"Page"}}, +{ %inheritance };
+		}
+	else
+		{
+		# Strange stuff. Complain and discard.
+		carp "While loading pages got object of type '", $data->{"/Type"}, "'";
+		}
+	}
 
-    /\\\r?\n?$/ && do { s/\\\r?\n?//;
-		  $readinfo_buffer = $readinfo_buffer . $_;
-		  next;
-		};
-    if ( $readinfo_buffer ) {
-      $readinfo_buffer = $readinfo_buffer . $_;
-      $readinfo_buffer =~ s/\r?\n?$//;
-      $_=$readinfo_buffer;
-      $readinfo_buffer="";
-    }
-#
-# Courtesy of Ross Moore
-#
-    my $str;
-    /\/Author/ && do { if ( s/\/Author\s*\(((\\\)|[^\)])*)\)\r?\n?/$1/ ) {
-                       $str=$1; $str =~ s/\\([()])/$1/g;
-                       $self->{Author} = $str if (!($self->{Author}));
-		       } else {
-			 s/\r?\n?$//;
-			 $readinfo_buffer = $_;
-		       }
-#		       next;
-                     };
-    /\/CreationDate/ && do { s/\/CreationDate\s\(((\\\)|[^\)])*)\)\r?\n?/$1/;
-                             $str=$1; $str =~ s/\\([()])/$1/g;
-                             $self->{CreationDate} = $str if (!($self->{CreationDate}));
-#		             next;
-		           };
-    /\/ModDate/ && do { s/\/ModDate\s\(((\\\)|[^\)])*)\)\r?\n?/$1/;
-                        $str=$1; $str =~ s/\\([()])/$1/g;
-                        $self->{ModDate} = $str if (!($self->{ModDate}));
-#		        next;
-		      };
-    /\/Creator/ && do { if ( s/\/Creator\s\(((\\\)|[^\)])*)\)\r?\n?/$1/ ) {
-                          $str=$1; $str =~ s/\\([()])/$1/g;
-                          $self->{Creator} = $str if (!($self->{Creator}));
-		        } else {
-		 	  s/\r?\n?$//;
-			  $readinfo_buffer = $_;
-		        }
-#		        next;
-		      };
-    /\/Producer/ && do { if ( s/\/Producer\s\(((\\\)|[^\)])*)\)\r?\n?/$1/) {
-                           $str=$1; $str =~ s/\\([()])/$1/g;
-                           $self->{Producer} = $str if (!($self->{Producer}));
-		         } else {
-		 	   s/\r?\n?$//;
-			   $readinfo_buffer = $_;
-		         }
-#		         next;
-		       };
-    /\/Title/ && do { if ( s/\/Title\s\(((\\\)|[^\)])*)\)\r?\n?/$1/) {
-                        $str=$1; $str =~ s/\\([()])/$1/g;
-                        $self->{Title} = $str if (!($self->{Title}));
-		      } else {
-		        s/\r?\n?$//;
-		        $readinfo_buffer = $_;
-		      }
-#		      next;
-		    };
-    /\/Subject/ && do { if ( s/\/Subject\s\(((\\\)|[^\)])*)\)\r?\n?/$1/) {
-                          $str=$1; $str =~ s/\\([()])/$1/g;
-                          $self->{Subject} = $str if (!($self->{Subject}));
-		        } else {
-		          s/\r?\n?$//;
-		          $readinfo_buffer = $_;
-		        }
-#		       next;
-		    };
-    /\/Keywords/ && do { if ( s/\/Keywords\s\(((\\\)|[^\)])*)\)\r?\n?/$1/) {
-                           $str=$1; $str =~ s/\\([()])/$1/g;
-                           $self->{Keywords} = $str if (!($self->{Keywords}));
-		         } else {
-		           s/\r?\n?$//;
-		           $readinfo_buffer = $_;
-		         }
-#		         next;
-		    };
-  }
-}
+#################################################################
+=pod
+
+=head2 TargetFile ( filename )
+
+This method links the filename to the pdf descriptor and parses all
+kind of header information.
+
+=cut
 
 sub TargetFile {
   my $self = shift;
   my $file = shift;
 
-  croak "Already linked to the file ",$self->{File_Name},"\n" if $self->{File_Name} ;
+  croak "Already linked to the file ",$self->{File_Name},"\n" 
+      if $self->{File_Name} ;
   
   my $offset;
 
@@ -299,198 +285,220 @@ sub TargetFile {
     read( FILE, $offset, 50 );
     $offset =~ s/[^s]*startxref\r?\n?(\d*)\r?\n?%%EOF\r?\n?/$1/;
 
-    ReadCrossReference_pass1(\*FILE, $offset, $self );
-    ReadCrossReference_pass2(\*FILE, $offset, $self );
-
-    $self->{File_Handler} = \*FILE;
+	$self->{"Last_XRef_Offset"} = $offset;
+    ReadCrossReference_pass1 (\*FILE, $offset, $self);
+	$self->{"Info"} = $self->GetObject ($self->{"Trailer"}{"/Info"});
+	$self->{"Catalog"} = $self->GetObject ($self->{"Trailer"}{"/Root"});
+	$self->{"PageTree"} = $self->GetObject ($self->{"Catalog"}{"/Pages"});
     return 1;
   } else {
     croak "I need a file name (!)";
-  }
+	}
 }
 
-sub GetInfo {
-  my $self = shift;
-  $_ = shift;
+#################################################################
+=pod
 
-  croak "PDF File not specified !\n" if ! $self->{File_Name}  ; 
+=head2 LoadPageInfo
 
-  /Author/ && return $self->{Author}; 
-  /CreationDate/ && return $self->{CreationDate}; 
-  /ModDate/ && return $self->{ModDate}; 
-  /Creator/ && return $self->{Creator}; 
-  /Producer/ && return $self->{Producer}; 
-  /Title/ && return $self->{Title}; 
-  /Subject/ && return $self->{Subject}; 
-  /Keywords/ && return $self->{Keywords}; 
+This function loads the information for all pages. This process can
+take some time for big PDF-files.
 
-}
+=cut
 
-sub Pages {
-  my $self = shift;
+sub LoadPageInfo (\*)
+	{
+	my $self = shift;
 
-  croak "PDF File not specified !\n" if ! $self->{File_Name}  ; 
-  $self->{PageTree}->ReadPageTree($self) if ! $self->{PageTree}->{Count};
-  return $self->{PageTree}->{Count};
-}
+	# Reset Page Array
+	$#{$self->{"Page"}} = -1;
 
-sub PageSize {
-  my $self = shift;
+	# Recurse
+	$self->LoadPageSubtree ($self->{"Catalog"}{"/Pages"});
+	}								
 
-  croak "PDF File not specified !\n" if ! $self->{File_Name}  ; 
-  $self->{PageTree}->ReadPageTree($self) if ! $self->{PageTree}->{Count};
-  return @{$self->{PageTree}->{MediaBox}};
-}
 
-sub PageRotation {
-  my $self = shift;
 
-  my $r=$self->{PageTree}->{Rotation};
-  $r=0 if ( ! $r ) ;
-  croak "PDF File not specified !\n" if ! $self->{File_Name}  ; 
-  $self->{PageTree}->ReadPageTree($self) if ! $self->{PageTree}->{Count};
-  $PDF::Verbose && do {
-   print "Rotation ",$r,": Portrait" if $r == 0 || $r == 180 ;
-   print "Rotation ",$r,": Landscape" if $r == 90 || $r == 270 ;
-  };
-  return $r;
-}
-1;
-__END__
+#################################################################
+=pod
 
-=head1 NAME
-
-PDF::Parse - Library for parsing a PDF file
-
-=head1 SYNOPSIS
-
-  use PDF::Parse;
-
-  $pdf=PDF::Parse->new ;
-  $pdf=PDF::Parse->new(filename);
-
-  $result=$pdf->TargetFile( filename );
-
-  print "is a pdf file\n" if ( $pdf->IsaPDF ) ;
-  print "Has ",$pdf->Pages," Pages \n";
-  print "Use a PDF Version  ",$pdf->Version ," \n";
-
-  print "filename with title",$pdf->GetInfo("Title"),"\n";
-  print "and with subject ",$pdf->GetInfo("Subject"),"\n";
-  print "was written by ",$pdf->GetInfo("Author"),"\n";
-  print "in date ",$pdf->GetInfo("CreationDate"),"\n";
-  print "using ",$pdf->GetInfo("Creator"),"\n";
-  print "and converted with ",$pdf->GetInfo("Producer"),"\n";
-  print "The last modification occurred ",$pdf->GetInfo("ModDate"),"\n";
-  print "The associated keywords are ",$pdf->GetInfo("Keywords"),"\n";
-
-  my (startx,starty, endx,endy) = $pdf->PageSize ;
-  my $rotation = $pdf->PageRotation ;
-
-=head1 DESCRIPTION
-
-The main purpose of the PDF library is to provide classes and functions 
-that allow to read and manipulate PDF files with perl. PDF stands for
-Portable Document Format and is a format proposed by Adobe. For
-more details abour PDF, refer to:
-
-B<http://www.adobe.com/> 
-
-For a detailed documentation, see the PDF library.
-
-The library is at is very beginning of development. 
-The main idea is to provide some "basic" modules for access 
-the information contained in a PDF file. Even if at this
-moment is in an early development stage, the three little 
-scripts provided with the library ( B<is_pdf>, B<pdf_version>, and 
-B<pdf_pages> ) show that it is usable. 
-
-B<is_pdf> script test a list of files in order divide the PDF file
-from the non PDF using the info provided by the files 
-themselves. It doesn't use the I<.pdf> extension, it uses the information
-contained in the file.
-
-B<pdf_version> returns the PDF level used for writing a file.
-
-B<pdf_pages> gives the number of pages of a PDF file. 
-
-=head1 Constructor
-
-=over 4
-
-=item B<new ( [ filename ] )>
-
-This is the constructor of a new PDF object. If the filename is missing, it returns an
-empty PDF descriptor ( can be filled with $pdf->TargetFile). Otherwise, It acts as the
-B<TargetFile> method.
-
-=back
-
-=head1 Methods
-
-The available methods are :
-
-=over 4
-
-=item B<TargetFile ( filename ) >
-
-This method links the filename to the pdf descriptor and check the header.
-
-=item B<Version>
+=head2 Version
 
 Returns the PDF version used for writing the object file.
 
-=item B<Pages>
+=cut
 
-Returns the number of pages of the object file. As side effect, 
-the PDF object contains part of the Catalog structure after 
-the call ( more specifically, part of the Root Page ).
+sub Version { 
+  return ($_[0]->{Header}); 
+}
 
-=item B<PageSize>
+#################################################################
+=pod
 
-Returns the size of the page of the object file. As side effect, 
-the PDF object contains part of the Catalog structure after 
-the call ( more specifically, part of the Root Page ).
+=head2 IsaPDF
 
-Note: At this development level, you cannot guess the size 
-of a single page.  Only the size of the root page is available. 
-Generally, the size of all the page is the same, because it's usually inherited from
-the root page , but this could 
-not be true if, for example, you merge two different document together.
+Returns true, if the file could be parsed and is a PDF-file.
 
-=item B<PageRotation>
+=cut
 
-Returns the rotation of the document with the PDF conventions:
+sub IsaPDF { 
+  return ($_[0]->{Header} != undef) ; 
+}
 
- 0 ==>   0 degree (default)
- 1 ==>  90 degrees
- 2 ==> 180 degrees
- 3 ==> 270 degrees
+#################################################################
+=pod
 
-Note: It suffer of the same limitations of the the PageSize method.
+=head2 IscryptPDF
 
-=back
+Returns true if the PDF contains a crypt object. This indicates that
+the data of the PDF-File is encrypted. In this case, not all function
+work as expected.
+
+=cut
+
+sub IscryptPDF { 
+  return ($_[0]->{Crypt_Object} != undef) ; 
+}
+
+#################################################################
+=pod
+
+=head2 GetInfo ( key )
+
+Returns the various information contained in the info section of a PDF
+file (if present). A PDF file can have:
+
+  a title ==> GetInfo ("Title")
+  a subject ==> GetInfo ("Subject")
+  an author ==> GetInfo("Author")
+  a creation date ==> GetInfo("CreationDate")
+  a creator ==> GetInfo("Creator")
+  a producer ==> GetInfo("Producer")
+  a modification date ==> GetInfo("ModDate")
+  some keywords ==> GetInfo("Keywords")
+
+=cut
+
+sub GetInfo (\*$)
+	{
+	my $self = shift;
+	my $type = shift;
+
+	return PDF::Core::UnQuoteString ($self->{"Info"}{"/" . $type})
+	}
+
+#################################################################
+=pod
+
+=head2 Pages
+
+Returns the number of pages of the PDF-file.
+
+=cut
+
+sub Pages 
+	{
+	my $self = shift;
+
+	return $self->{"PageTree"}{"/Count"};
+	}
+
+#################################################################
+=pod
+
+=head2 PageSize ( [ page ] )
+
+Returns the size of a page in the PDF-file. If no parameter is given,
+the default size of the root page will be returned. This value may be
+overridden for any page.
+
+If the size of an individual page is requested and the page data is
+not already loaded, the method B<LoadPageInfo> will be executed. This
+may take some time for large PDF-files. The size of the root page is
+always available and will never execute B<LoadPageInfo>.
+
+=cut
+
+sub PageSize (;$)
+	{
+	my $self = shift;
+	my $page = shift;
+
+	if ($page > 0)
+		{
+		return undef if ($page > $self->{"PageTree"}{"/Count"});
+		$self->LoadPageInfo unless ($#{$self->{"Page"}} >= 0);
+		
+		return @{$self->{"Page"}[$page - 1]{"/MediaBox"}}
+		if (defined $self->{"Page"}[$page - 1]{"/MediaBox"});
+		}
+	else
+		{
+		return @{$self->{"PageTree"}{"/MediaBox"}}
+		if (defined $self->{"PageTree"}{"/MediaBox"});
+		}
+
+	return undef;
+	}
+
+#################################################################
+=pod
+
+=head2 PageRotation ( [ page ] )
+
+Returns the rotation of a page in the PDF-file. If no parameter is given,
+the default rotation of the root page will be returned. This value may be
+overridden for any page.
+
+If the rotation of an individual page is requested and the page data is
+not already loaded, the method B<LoadPageInfo> will be executed. This
+may take some time for large PDF-files. The rotation of the root page is
+always available and will never execute B<LoadPageInfo>.
+
+=cut
+sub PageRotation (;$)
+	{
+	my $self = shift;
+	my $page = shift;
+
+	my $rotate = 0;
+
+	if ($page > 0)
+		{
+		return undef if ($page > $self->{"PageTree"}{"/Count"});
+		$self->LoadPageInfo unless ($#{$self->{"Page"}} >= 0);
+		
+		$rotate = $self->{"Page"}[$page - 1]{"/Rotate"};
+		}
+	else
+		{
+		$rotate = $self->{"PageTree"}{"/Rotate"};
+		}
+
+	print "Rotation ", 0 + $rotate if ($PDF::Verbose);
+
+	return 0 + $rotate;
+	}
+#################################################################
+1;
+__END__
 
 =head1 Variables
 
-There are 2 variables that can be accessed:
+The only available variable is :
 
-=over 4
+=over
 
-=item B<$PDF::VERSION>
+=item B<$PDF::Parse::VERSION>
 
-Contain the version of the library installed
+Contains the version of the library installed
 
-=item B<$PDF::Verbose>
+=back
 
-This variable is false by default. Change the value if you want 
-more verbose output messages from library
-
-=back 4
 
 =head1 Copyright
 
-  Copyright 1998, Antonio Rosella antro@technologist.com
+  Copyright (c) 1998 - 2000 Antonio Rosella Italy antro@tiscalinet.it, Johannes Blach dw235@yahoo.com 
 
 This library is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.

@@ -1,46 +1,32 @@
 #
-# PDF.pm, version 1.10 November 1999 antro
+# PDF.pm, version 1.11 February 2000 antro
 #
-# Copyright (c) 1998 -1999 Antonio Rosella Italy antro@tiscalinet.it
+# Copyright (c) 1998 - 2000 Antonio Rosella Italy antro@tiscalinet.it, Johannes Blach dw235@yahoo.com 
 #
 # Free usage under the same Perl Licence condition.
 #
 
 package PDF;
 
-$PDF::VERSION = "1.10";
+$PDF::VERSION = "1.11";
 
-require 5.004;
+require 5.005;
 
 require PDF::Core;  
 require PDF::Parse;  
 
+use strict;
 use Carp;
 use Exporter ();
+
+use vars qw(@ISA $Verbose);
 
 #
 # Verbose off by default
 #
-
-my $Verbose = 0;
+$Verbose = 0;
 
 @ISA = qw(Exporter PDF::Core PDF::Parse);
-
-@EXPORT_OK = qw( IsaPDF Version IscryptPDF );
-
-use vars qw( $Verbose ) ;
-
-sub Version { 
-  return ($_[0]->{Header}); 
-}
-
-sub IsaPDF { 
-  return ($_[0]->{Header} != undef) ; 
-}
-
-sub IscryptPDF { 
-  return ($_[0]->{Crypt_Object} != undef) ; 
-}
 
 1;
 
@@ -73,16 +59,18 @@ PDF - Library for PDF access and manipulation in Perl
   print "The last modification occurred ",$pdf->GetInfo("ModDate"),"\n";
   print "The associated keywords are ",$pdf->GetInfo("Keywords"),"\n";
 
-  my (startx,starty, endx,endy) = $pdf->PageSize ;
+  my (startx,starty, endx,endy) = $pdf->PageSize ($page) ;
 
 =head1 DESCRIPTION
 
-The main purpose of the PDF library is to provide classes and functions 
-that allow to read and manipulate PDF files with perl. PDF stands for
-Portable Document Format and is a format proposed by Adobe. For
-more details abour PDF, refer to:
+The main purpose of the PDF library is to provide classes and
+functions that allow to read and manipulate PDF files with perl. PDF
+stands for Portable Document Format and is a format proposed by Adobe.
+A full description of this format can be found in the B<Portable
+Document Reference Manual> by B<Adobe Systems Inc.>. For more details
+about PDF, refer to:
 
-B<http://www.adobe.com/> 
+B<http://www.adobe.com/>
 
 The main idea is to provide some "basic" modules for access 
 the information contained in a PDF file. Even if at this
@@ -98,80 +86,21 @@ B<pdf_version> returns the PDF level used for writing a file.
 
 B<pdf_pages> gives the number of pages of a PDF file. 
 
-The original library is now splitted in 3 section :
+B<pagedump.pl> prints some information about individual pages in a
+PDF-file. Although the information as such are not very useful, it
+demontrates well some more complex aspects of the library. Check the
+function B<doprint> in this program on how to handle all possible data
+occuring in a PDF.
 
-B<PDF::Core> that contains the data structure and the constructor;
-B<PDF::Parse> that read a PDF from an external file.
-B<PDF::Pages> that deal with the PDF page tree.
+The library is now splitted in 2 section :
 
-=head1 Constructor
+B<PDF::Core> that contains the data structure, the constructor and low
+level access fuctions;
 
-=over 4
+B<PDF::Parse> all kind of functions to parse the PDF-files and
+provide information about the content.
 
-=item B<new ( [ filename ] )>
-
-This is the constructor of a new PDF object. If the filename is missing, it returns an
-empty PDF descriptor ( can be filled with $pdf->TargetFile ). Otherwise, It acts as the
-B<TargetFile> method.
-
-=back
-
-=head1 Methods
-
-The available methods are :
-
-=over 4
-
-=item B<TargetFile ( filename ) >
-
-This method links the filename to the pdf descriptor and check the header.
-
-=item B<IsaPDF>
-
-Returns true if the parsed file is a PDF one.
-
-=item B<IscryptPDF>
-
-Returns true if the parsed PDFfile is a crypted PDF.
-
-=item B<Version>
-
-Returns the PDF version used for writing the object file.
-
-=item B<Pages>
-
-Returns the number of pages of the object file. As side effect, 
-the PDF object contains part of the Catalog structure after 
-the call ( more specifically, part of the Root Tree ).
-
-=item B<GetInfo>
-
-  Return the various information contained in the info section of
-  a PDF file ( if present ). A PDF file can have :
-
-  a title ( B<GetInfo("Title")> )
-  a subject ( B<GetInfo("Subject") )
-  an author ( B<GetInfo("Author") )
-  a creation date ( B<GetInfo("CreationDate") )
-  a creator ( B<GetInfo("Creator") )
-  a producer ( B<GetInfo("Producer") )
-  a modification date ( B<GetInfo("ModDate") )
-  some keywords ( B<GetInfo("Keywords") )
-
-Note: with the current implementation, if the Info object of a PDF was updated one or more
-times, only the last modification is found.
-
-=item B<PageSize>
-
-Returns the size of the page of the object file. As side effect, 
-the PDF object contains part of the Catalog structure after 
-the call ( more specifically, part of the Root Page ).
-
-Note: At this development level, you cannot guess the size 
-of a single page.  Only the size of the root page is available. 
-Generally, the size of all the page is the same, but this could 
-not be true if, for example, you merge two different document together.
-=back
+Check the help-files of these modules for more details.
 
 =head1 Variables
 
@@ -192,7 +121,7 @@ more verbose output messages from library.
 
 =head1 Copyright
 
-  Copyright 1998, Antonio Rosella antro@technologist.com
+  Copyright (c) 1998 - 2000 Antonio Rosella Italy antro@tiscalinet.it, Johannes Blach dw235@yahoo.com 
 
 This library is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.

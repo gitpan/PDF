@@ -1,4 +1,4 @@
-New Release: 1.10
+New Release: 1.11
 
 Name           DSLI  Description                                  Info
 -----------    ----  -------------------------------------------- -----
@@ -25,11 +25,9 @@ A Perl distribution :-)
 
 NEWS:
 
-Added some support for iso character.
+Many thanks to Johannes Blach ( dw235@yahoo.com ) for all his work on the library.
 
-Correct page counter of updated files. 
-
-ReadInfo bug fix
+Now we have a better core support, a completly rewritten page section and much more.
 
 AVAILABILITY:
 
