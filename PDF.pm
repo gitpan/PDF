@@ -1,14 +1,14 @@
 #
-# PDF.pm, version 1.05 Mar 1998 antro
+# PDF.pm, version 1.06 Sep 1998 antro
 #
-# Copyright (c) 1998 Antonio Rosella Italy
+# Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
 #
 # Free usage under the same Perl Licence condition.
 #
 
 package PDF;
 
-$PDF::VERSION = "1.05";
+$PDF::VERSION = "1.06";
 
 require 5.004;
 
@@ -67,6 +67,8 @@ PDF - Library for PDF access and manipulation in Perl
   print "and converted with ",$pdf->GetInfo("Producer"),"\n";
   print "The last modification occurred ",$pdf->GetInfo("ModDate"),"\n";
   print "The associated keywords are ",$pdf->GetInfo("Keywords"),"\n";
+
+  my (startx,starty, endx,endy) = $pdf->PageSize ;
 
 =head1 DESCRIPTION
 
@@ -149,6 +151,16 @@ the call ( more specifically, part of the Root Tree ).
 Note: with the current implementation, if the Info object of a PDF was updated one or more
 times, only the last modification is found.
 
+=item B<PageSize>
+
+Returns the size of the page of the object file. As side effect, 
+the PDF object contains part of the Catalog structure after 
+the call ( more specifically, part of the Root Page ).
+
+Note: At this development level, you cannot guess the size 
+of a single page.  Only the size of the root page is available. 
+Generally, the size of all the page is the same, but this could 
+not be true if, for example, you merge two different document together.
 =back
 
 =head1 Variables
@@ -159,12 +171,12 @@ There are 2 variables that can be accessed:
 
 =item B<$PDF::VERSION>
 
-Contain the version of the library installed
+Contain the version of the library installed.
 
 =item B<$PDF::Verbose>
 
 This variable is false by default. Change the value if you want 
-more verbose output messages from library
+more verbose output messages from library.
 
 =back 4
 
@@ -184,3 +196,5 @@ http://www.geocities.com/CapeCanaveral/Hangar/4794/
 and at any CPAN mirror
 
 =cut
+
+

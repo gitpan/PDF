@@ -1,16 +1,18 @@
 #
-# PDF::Pages.pm, version 1.05 Mar 1998 antro
+# PDF::Pages.pm, version 1.06 Sep 1998 antro
 #
-# Copyright (c) 1998 Antonio Rosella Italy
+# Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
 #
 # Free usage under the same Perl Licence condition.
 #
 
 package PDF::Pages;
 
-$PDF::Pages::VERSION = "1.05";
+$PDF::Pages::VERSION = "1.06";
 
 require 5.004;
+require PDF::Core;
+
 use Carp;
 use Exporter ();
 
@@ -22,8 +24,11 @@ sub new {
 
 my %PDF_Pages = (
    Count => 0,
+   Kids => [ ],
+   MediaBox => [ ],
    Page_obj_nr => 0,
    Parent => 0,
+   Rotate => 0,
 );
 
   $/="\r";
@@ -40,6 +45,7 @@ sub ReadPageTree {
   croak "PDF File not specified !\n" if ! $pdf_struct->{File_Name}  ; 
 
   open (FILE, "$pdf_struct->{File_Name}");
+  binmode FILE;
   if ($pdf_struct->{Catalog}) {
     my $old_seek;
     my $ro = $pdf_struct->{Root_Object};
@@ -61,7 +67,6 @@ sub ReadPageTree {
 		      seek FILE, $old_seek, 0 ;
 		      next;
 		    };
-#     $self->{Count} = $_ if /\/Count\s+/ ;
       next if /\/Parent/ ;
       next if /\/Kids/ ;
       last if />>\r?\n?/ ;
@@ -91,7 +96,15 @@ sub ReadPage {
 			   next;
       };
       next if /\/Parent/ ;
-      next if /\/Kids/ ;
+      /^\/MediaBox\s+/ && do { s/\n?\r?\/MediaBox\s+\[([^\]]*)\]\s*\r?\n?/$1/; 
+                               my @mb =  split(" "); 
+                               $self->{MediaBox} =  [ @mb ]; 
+			       next;
+			       };
+      /^\/Rotate\s+/ && do { s/\n?\r?\/Rotate\s+(\d+)\s*\r?\n?/$1/; 
+                               $self->{Rotate} = $_; 
+			       next;
+			       };
       last if />>/ ;
     };
     return $result;

@@ -1,14 +1,14 @@
 #
-# PDF::Parse.pm, version 1.05 Mar 1998 antro
+# PDF::Parse.pm, version 1.06 Sep 1998 antro
 #
-# Copyright (c) 1998 Antonio Rosella Italy
+# Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
 #
 # Free usage under the same Perl Licence condition.
 #
 
 package PDF::Parse;
 
-$PDF::Parse::VERSION = "1.05";
+$PDF::Parse::VERSION = "1.06";
 
 require 5.004;
 require PDF::Core;
@@ -16,13 +16,9 @@ require PDF::Core;
 use Carp;
 use Exporter ();
 
-#
-# Verbose off by default
-#
-
 @ISA = qw(Exporter PDF::Core);
 
-@EXPORT_OK = qw( GetInfo TargetFile Pages );
+@EXPORT_OK = qw( GetInfo TargetFile Pages PageSize PageRotation);
 
 sub ReadCrossReference_pass1 {
     my $fd = shift;
@@ -33,7 +29,6 @@ sub ReadCrossReference_pass1 {
     my $obj_counter=0;
     my $global_obj_counter=0;
     my $buf;
-    my $first_level;
 
     seek $fd, $offset, 0;
     $_=<$fd>;
@@ -90,7 +85,6 @@ while(<$fd>) {
     /Size\s*\d+\r?\n?/ && do { s/\/Size\s*(\d+)\r?\n?/$1/;
 		   if ( ! $self->{Cross_Reference_Size}) {
 		     $self->{Cross_Reference_Size} = $_ ;
-		     $first_level=1;
 		   }
 		   next;} ;
     /Root/ && do { s/\/Root\s+(\d+\s+\d+)\s+R\r?\n?/$1/;
@@ -108,10 +102,6 @@ while(<$fd>) {
 		   my $old_seek = tell $fd;
 		   $global_obj_counter += ReadCrossReference_pass1($fd,$_, $self );
 		   seek $fd, $old_seek, 0;
-		   if ($first_level ) {
-			$self->{Cross_Reference_Size} != $global_obj_counter &&
-			  warn "Cross-reference table corrupted! $global_obj_counter objects read, $self->{Cross_Reference_Size} requested \n";
-		   }
 		   next;
 		 };
   }
@@ -245,6 +235,7 @@ sub TargetFile {
 
   if ( $file ) {
     open(FILE, "< $file") or croak "can't open $file: $!";
+    binmode FILE;
     $self->{File_Name} = $file ;
     $self->{File_Handler} = \*FILE;
     my $buf;
@@ -256,14 +247,6 @@ sub TargetFile {
     read(FILE,$buf,4);
     $buf =~ s/-//;
     $self->{Header}= $buf;
-#
-# Attempt for endline
-#
-    read(FILE,$_,1);
-    $/ = "\r" if /\r/ ;
-    read(FILE,$_,1);
-    $/ = "\n" if /\n/ ;
-
     seek FILE,-50,2;
     read( FILE, $offset, 50 );
     $offset =~ s/[^s]*startxref\r?\n?(\d*)\r?\n?%%EOF\r?\n?/$1/;
@@ -303,6 +286,27 @@ sub Pages {
   return $self->{PageTree}->{Count};
 }
 
+sub PageSize {
+  my $self = shift;
+
+  croak "PDF File not specified !\n" if ! $self->{File_Name}  ; 
+  $self->{PageTree}->ReadPageTree($self) if ! $self->{PageTree}->{Count};
+  return @{$self->{PageTree}->{MediaBox}};
+}
+
+sub PageRotation {
+  my $self = shift;
+
+  my $r=$self->{PageTree}->{Rotation};
+  $r=0 if ( ! $r ) ;
+  croak "PDF File not specified !\n" if ! $self->{File_Name}  ; 
+  $self->{PageTree}->ReadPageTree($self) if ! $self->{PageTree}->{Count};
+  $PDF::Verbose && do {
+   print "Rotation ",$r,": Portrait" if $r == 0 || $r == 180 ;
+   print "Rotation ",$r,": Landscape" if $r == 90 || $r == 270 ;
+  };
+  return $r;
+}
 1;
 __END__
 
@@ -331,6 +335,9 @@ PDF::Parse - Library for parsing a PDF file
   print "and converted with ",$pdf->GetInfo("Producer"),"\n";
   print "The last modification occurred ",$pdf->GetInfo("ModDate"),"\n";
   print "The associated keywords are ",$pdf->GetInfo("Keywords"),"\n";
+
+  my (startx,starty, endx,endy) = $pdf->PageSize ;
+  my $rotation = $pdf->PageRotation ;
 
 =head1 DESCRIPTION
 
@@ -390,6 +397,29 @@ Returns the PDF version used for writing the object file.
 Returns the number of pages of the object file. As side effect, 
 the PDF object contains part of the Catalog structure after 
 the call ( more specifically, part of the Root Page ).
+
+=item B<PageSize>
+
+Returns the size of the page of the object file. As side effect, 
+the PDF object contains part of the Catalog structure after 
+the call ( more specifically, part of the Root Page ).
+
+Note: At this development level, you cannot guess the size 
+of a single page.  Only the size of the root page is available. 
+Generally, the size of all the page is the same, because it's usually inherited from
+the root page , but this could 
+not be true if, for example, you merge two different document together.
+
+=item B<PageRotation>
+
+Returns the rotation of the document with the PDF conventions:
+
+ 0 ==>   0 degree (default)
+ 1 ==>  90 degrees
+ 2 ==> 180 degrees
+ 3 ==> 270 degrees
+
+Note: It suffer of the same limitations of the the PageSize method.
 
 =back
 

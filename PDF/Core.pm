@@ -1,14 +1,14 @@
 #
-# PDF::Core.pm, version 1.05 Mar 1998 antro
+# PDF::Core.pm, version 1.06 Sep 1998 antro
 #
-# Copyright (c) 1998 Antonio Rosella Italy
+# Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
 #
 # Free usage under the same Perl Licence condition.
 #
 
 package PDF::Core;
 
-$PDF::Core::VERSION = "1.05";
+$PDF::Core::VERSION = "1.06";
 
 require 5.004;
 use Carp;

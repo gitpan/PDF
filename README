@@ -1,4 +1,4 @@
-New Release: 1.05
+New Release: 1.06
 
 Name           DSLI  Description                                  Info
 -----------    ----  -------------------------------------------- -----
@@ -19,10 +19,13 @@ if a file is a PDF ( not looking at the .pdf extension :-), the PDF
 version used to write them, their number of pages and the various 
 Info ( Author, Creation date, etc. ).
 
+PREREQUISITES:
+
+A Perl distribution :-)
+
 NEWS:
 
-The library can now handle correctly an Info Dictionary with string
-multiline.
+DOS bug-fix, it now should work 
 
 AVAILABILITY:
 
