@@ -1,5 +1,5 @@
 #
-# PDF::Core.pm, version 1.08 Dec 1998 antro
+# PDF::Core.pm, version 1.09 March 1998 antro
 #
 # Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
 #
@@ -8,7 +8,7 @@
 
 package PDF::Core;
 
-$PDF::Core::VERSION = "1.08";
+$PDF::Core::VERSION = "1.09";
 
 require 5.004;
 use Carp;
@@ -36,6 +36,7 @@ my %PDF_Fields = (
    PageTree => PDF::Pages->new,
    Producer => "",
    Root_Object => undef,
+   Crypt_Object => undef,
    Subject => "",
    Title => "",
    Updated => 0, 

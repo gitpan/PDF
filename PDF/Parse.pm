@@ -1,5 +1,5 @@
 #
-# PDF::Parse.pm, version 1.08 Dec 1998 antro
+# PDF::Parse.pm, version 1.09 March 1999 antro
 #
 # Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
 #
@@ -8,7 +8,7 @@
 
 package PDF::Parse;
 
-$PDF::Parse::VERSION = "1.08";
+$PDF::Parse::VERSION = "1.09";
 
 require 5.004;
 require PDF::Core;
@@ -103,7 +103,12 @@ sub ReadCrossReference_pass1 {
 		 };
     /Info/ && next;
     /ID/ && next;
-    /Encrypt/ && next;
+    /Encrypt/ && do { s/\/Encrypt\s+(\d+\s+\d+)\s+R\r?\n?/$1/;
+		   if ( ! $self->{Crypt_Object}) {
+		     $self->{Crypt_Object}=$_;
+		   }
+		   next;
+		 };
     /Prev/ && do {  
 		   s/\/Prev\s*(\d+)\r?\n?/$1/;
     		   $self->{Updated}=1;

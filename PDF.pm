@@ -1,5 +1,5 @@
 #
-# PDF.pm, version 1.08 Dec 1998 antro
+# PDF.pm, version 1.09 March 1998 antro
 #
 # Copyright (c) 1998 Antonio Rosella Italy antro@technologist.com
 #
@@ -8,7 +8,7 @@
 
 package PDF;
 
-$PDF::VERSION = "1.08";
+$PDF::VERSION = "1.09";
 
 require 5.004;
 
@@ -26,7 +26,7 @@ my $Verbose = 0;
 
 @ISA = qw(Exporter PDF::Core PDF::Parse);
 
-@EXPORT_OK = qw( IsaPDF Version );
+@EXPORT_OK = qw( IsaPDF Version IscryptPDF );
 
 use vars qw( $Verbose ) ;
 
@@ -36,6 +36,10 @@ sub Version {
 
 sub IsaPDF { 
   return ($_[0]->{Header} != undef) ; 
+}
+
+sub IscryptPDF { 
+  return ($_[0]->{Crypt_Object} != undef) ; 
 }
 
 1;
@@ -58,6 +62,7 @@ PDF - Library for PDF access and manipulation in Perl
   print "is a pdf file\n" if ( $pdf->IsaPDF ) ;
   print "Has ",$pdf->Pages," Pages \n";
   print "Use a PDF Version  ",$pdf->Version ," \n";
+  print "and it is crypted  " if ( $pdf->IscryptedPDF) ;
 
   print "filename with title",$pdf->GetInfo("Title"),"\n";
   print "and with subject ",$pdf->GetInfo("Subject"),"\n";
@@ -99,9 +104,6 @@ B<PDF::Core> that contains the data structure and the constructor;
 B<PDF::Parse> that read a PDF from an external file.
 B<PDF::Pages> that deal with the PDF page tree.
 
-Many thanks to Brad Appleton ( bradapp@enteract.com ) for his suggestions 
-about the module organization.
-
 =head1 Constructor
 
 =over 4
@@ -123,6 +125,14 @@ The available methods are :
 =item B<TargetFile ( filename ) >
 
 This method links the filename to the pdf descriptor and check the header.
+
+=item B<IsaPDF>
+
+Returns true if the parsed file is a PDF one.
+
+=item B<IscryptPDF>
+
+Returns true if the parsed PDFfile is a crypted PDF.
 
 =item B<Version>
 
@@ -194,6 +204,12 @@ The latest version of this library is likely to be available from:
 http://www.geocities.com/CapeCanaveral/Hangar/4794/
 
 and at any CPAN mirror
+
+=head1 Greetings
+
+Fabrizio Pivari ( pivari@geocities.com ) for all the suggestions about life, the universe and everything.
+Brad Appleton ( bradapp@enteract.com ) for his suggestions about the module organization.
+Thomas Drillich for the iso latin1 support 
 
 =cut
 
