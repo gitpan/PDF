@@ -36,20 +36,22 @@ sub new {
   my $that = shift;
   my $class=ref($that) || $that ;
   my $self ={ \%PDF_Fields, } ;
+
+  $/="\r";
+
   if ( @_ ) { 			# I have the filename
-    my $buf;
     open(FILE, "< @_[0]") or croak "can't open @_[0]: $!";
-    read FILE, $buf, 4 ;
-    if ( $buf ne "%PDF" ) {
+    $_=<FILE>;
+    if ( ! /^%PDF/ ) {
      $Verbose && croak "File @_[0] is not PDF compliant !"; 
      return 0 ;
     }
-    read FILE, $buf , 4 ;
-    $buf =~ s/-// ;
-    $self->{Header}= $buf;
+    s/%PDF-// ;
+    $self->{Header}= $_;
     $self->{File_Handler} = \*FILE;
     $self->{File_Name} = @_[0];
   }
+  $/="\n";
   return bless $self, $class;
 };
 

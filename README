@@ -1,6 +1,6 @@
 Proposed Module List Entry:
 
-PDF        adpO  Generate reports from various logfiles
+PDF        adpO  Access information in a PDF file
 
 The PDF library is a proposed library for access the information 
 contained inside a PDF file. It is at its early development stage and
