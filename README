@@ -1,4 +1,4 @@
-New Release: 1.04
+New Release: 1.05
 
 Name           DSLI  Description                                  Info
 -----------    ----  -------------------------------------------- -----
@@ -21,16 +21,10 @@ Info ( Author, Creation date, etc. ).
 
 NEWS:
 
-The library is now splitted in several files:
+The library can now handle correctly an Info Dictionary with string
+multiline.
 
-PDF  
-PDF::Core  
-PDF::Pages  
-PDF::Parse
-
-for a better developing.
-
-The Info Dictionary is now accessible ( Author, Title, Creator, etc. )
+AVAILABILITY:
 
 The library is available at 
 

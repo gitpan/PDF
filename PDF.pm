@@ -1,5 +1,5 @@
 #
-# PDF.pm, version 1.04 Feb 1998 antro
+# PDF.pm, version 1.05 Mar 1998 antro
 #
 # Copyright (c) 1998 Antonio Rosella Italy
 #
@@ -8,7 +8,7 @@
 
 package PDF;
 
-$PDF::VERSION = "1.04";
+$PDF::VERSION = "1.05";
 
 require 5.004;
 

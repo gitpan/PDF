@@ -1,5 +1,5 @@
 #
-# PDF::Parse.pm, version 1.04 Feb 1998 antro
+# PDF::Parse.pm, version 1.05 Mar 1998 antro
 #
 # Copyright (c) 1998 Antonio Rosella Italy
 #
@@ -8,7 +8,7 @@
 
 package PDF::Parse;
 
-$PDF::Parse::VERSION = "1.04";
+$PDF::Parse::VERSION = "1.05";
 
 require 5.004;
 require PDF::Core;
@@ -125,9 +125,6 @@ sub ReadCrossReference_pass2 {
 
   seek $fd, $offset, 0;
   $_=<$fd>;
-  while (<$fd>) {
-    last if /^trailer\r?\n?/ ;
-  }
 
   while(<$fd>) {
     last if /startxref\r?\n?/ ;
@@ -166,33 +163,75 @@ sub ReadInfo {
   my ($ro, $gen ) = split(" ",$info_obj);
   my $ro_gen=$self->{Gen_Num}[$ro];
   seek $fd, $self->{Objects}[$ro] ,0 ;
+  my $readinfo_buffer;
   while (<$fd>) {
-    /\/Author/ && do { s/\/Author\s\(([^\)]+)\)\r?\n?/$1/;
-		       $self->{Author} = $_ if (!($self->{Author}));
+    /\\\r?\n?$/ && do { s/\\\r?\n?//;
+		  $readinfo_buffer = $readinfo_buffer . $_;
+		  next;
+		};
+    if ( $readinfo_buffer ) {
+      $readinfo_buffer = $readinfo_buffer . $_;
+      $readinfo_buffer =~ s/\r?\n?$//;
+      $_=$readinfo_buffer;
+      $readinfo_buffer="";
+    }
+    /\/Author/ && do { if ( s/\/Author\s*\(([^\)]+)\)\r?\n?/$1/ ) {
+		         $self->{Author} = $_ if (!($self->{Author}));
+		       } else {
+			 s/\r?\n?$//;
+			 $readinfo_buffer = $_;
+		       }
+		       next;
                      };
     /\/CreationDate/ && do { s/\/CreationDate\s\(([^\)]+)\)\r?\n?/$1/;
-		       $self->{CreationDate} = $_ if (!($self->{CreationDate}));
-		    };
+  		             $self->{CreationDate} = $_ if (!($self->{CreationDate}));
+		             next;
+		           };
     /\/ModDate/ && do { s/\/ModDate\s\(([^\)]+)\)\r?\n?/$1/;
-		       $self->{ModDate} = $_ if (!($self->{ModDate}));
+		        $self->{ModDate} = $_ if (!($self->{ModDate}));
+		        next;
+		      };
+    /\/Creator/ && do { if ( s/\/Creator\s\(([^\)]+)\)\r?\n?/$1/ ) {
+		          $self->{Creator} = $_ if (!($self->{Creator}));
+		        } else {
+		 	  s/\r?\n?$//;
+			  $readinfo_buffer = $_;
+		        }
+		        next;
+		      };
+    /\/Producer/ && do { if ( s/\/Producer\s\(([^\)]+)\)\r?\n?/$1/) {
+		           $self->{Producer} = $_ if (!($self->{Producer}));
+		         } else {
+		 	   s/\r?\n?$//;
+			   $readinfo_buffer = $_;
+		         }
+		         next;
+		       };
+    /\/Title/ && do { if ( s/\/Title\s\(([^\)]+)\)\r?\n?/$1/) {
+		        $self->{Title} = $_ if (!($self->{Title}));
+		      } else {
+		        s/\r?\n?$//;
+		        $readinfo_buffer = $_;
+		      }
+		      next;
 		    };
-    /\/Creator/ && do { s/\/Creator\s\(([^\)]+)\)\r?\n?/$1/;
-		       $self->{Creator} = $_ if (!($self->{Creator}));
+    /\/Subject/ && do { if ( s/\/Subject\s\(([^\)]+)\)\r?\n?/$1/) {
+		          $self->{Subject} = $_ if (!($self->{Subject}));
+		        } else {
+		          s/\r?\n?$//;
+		          $readinfo_buffer = $_;
+		        }
+		       next;
 		    };
-    /\/Producer/ && do { s/\/Producer\s\(([^\)]+)\)\r?\n?/$1/;
-		       $self->{Producer} = $_ if (!($self->{Producer}));
-		    };
-    /\/Title/ && do { s/\/Title\s\(([^\)]+)\)\r?\n?/$1/;
-		       $self->{Title} = $_ if (!($self->{Title}));
-		    };
-    /\/Subject/ && do { s/\/Subject\s\(([^\)]+)\)\r?\n?/$1/;
-		       $self->{Subject} = $_ if (!($self->{Subject}));
-		    };
-    /\/Keywords/ && do { s/\/Keywords\s\(([^\)]+)\)\r?\n?/$1/;
-		       $self->{Keywords} = $_ if (!($self->{Keywords}));
+    /\/Keywords/ && do { if ( s/\/Keywords\s\(([^\)]+)\)\r?\n?/$1/) {
+		           $self->{Keywords} = $_ if (!($self->{Keywords}));
+		         } else {
+		           s/\r?\n?$//;
+		           $readinfo_buffer = $_;
+		         }
+		         next;
 		    };
     last if />>\r?\n?/ ;
-
   }
 }
 
@@ -254,10 +293,6 @@ sub GetInfo {
   /Subject/ && return $self->{Subject}; 
   /Keywords/ && return $self->{Keywords}; 
 
-# SWITCH: { 
-#     last SWITCH;
-#   }
-     
 }
 
 sub Pages {

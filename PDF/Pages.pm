@@ -1,5 +1,5 @@
 #
-# PDF::Pages.pm, version 1.04 Feb 1998 antro
+# PDF::Pages.pm, version 1.05 Mar 1998 antro
 #
 # Copyright (c) 1998 Antonio Rosella Italy
 #
@@ -8,7 +8,7 @@
 
 package PDF::Pages;
 
-$PDF::Pages::VERSION = "1.04";
+$PDF::Pages::VERSION = "1.05";
 
 require 5.004;
 use Carp;
@@ -22,8 +22,6 @@ sub new {
 
 my %PDF_Pages = (
    Count => 0,
-   Kids => [],
-   MediaBox => 0,
    Page_obj_nr => 0,
    Parent => 0,
 );
@@ -43,10 +41,14 @@ sub ReadPageTree {
 
   open (FILE, "$pdf_struct->{File_Name}");
   if ($pdf_struct->{Catalog}) {
+    my $old_seek;
     my $ro = $pdf_struct->{Root_Object};
     $ro =~ s/(\d+)\s+\d+/$1/;
     my $ro_gen=$pdf_struct->{Gen_Num}[$ro];
     seek FILE, $pdf_struct->{Objects}[$ro] ,0 ;
+#
+# At start of Catalog
+#
     while (<FILE>) {
       next if /$ro\s+$ro_gen\s+obj\r?\n?/ ; 
       next if /<<\r?\n?/  ;
@@ -54,8 +56,14 @@ sub ReadPageTree {
 		      $pdf_struct->{Catalog}->{Pages} = $_;
 		      my ($ind,$gen)=split(" ",$pdf_struct->{Catalog}->{Pages});
 		      $pdf_struct->{Gen_Num}[$ind] != $gen && die "Can't find Pages Node\n";
+		      $old_seek = tell FILE;
                       $self->ReadPage(\*FILE, $pdf_struct->{Objects}[$ind], 0 );
+		      seek FILE, $old_seek, 0 ;
+		      next;
 		    };
+#     $self->{Count} = $_ if /\/Count\s+/ ;
+      next if /\/Parent/ ;
+      next if /\/Kids/ ;
       last if />>\r?\n?/ ;
     }
   }
@@ -77,13 +85,15 @@ sub ReadPage {
     $_=<$fd>;
     while(<$fd>) {
       next if /<</ ;
-      /^\/Type\s+/ && do { croak " Page tree corrupted!\n" if !(/\/Pages/ ); }; 
-      $self->{Count} = $_ if /\/Count\s+/ ;
+      /^\/Type\s+/ && do { croak " Page tree corrupted!\n" if !(/\/Page/ ); next; }; 
+      /\/Count\s+/ && do { s/\n?\r?\/Count\s+(\d+)\s*\r?\n?/$1/; 
+                           $self->{Count} = $_ ;
+			   next;
+      };
       next if /\/Parent/ ;
       next if /\/Kids/ ;
       last if />>/ ;
-    }
-    $self->{Count} =~ s/\n?\r?\/Count\s+(\d+)\s*\r?\n?/$1/;
+    };
     return $result;
 }
 
