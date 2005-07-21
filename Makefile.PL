@@ -1,33 +1,13 @@
-# $Id: Makefile.PL,v 1.2 1998/01/15 10:55:41 ag71333 Exp ag71333 $
-#
-# Copyright (c) 1998 - 2000 Antonio Rosella Italy
-#
-# Free usage under the same Perl Licence condition.
-#
-
-BEGIN { require 5.005 }
-
-use ExtUtils::MakeMaker 5.16, qw(WriteMakefile $Verbose);
-use Config;
-
-if ($] < 5.005) {
-	print "\n*** You are using an old version of Perl. ***\n\a";
-	print "Perl 5.005 fixes many bugs in older versions and is highly recommended.\n";
-	sleep 5;
-}
-
-%opts = (
-	NAME=> 'PDF',
-	VERSION_FROM=> 'PDF.pm',
-	clean => { FILES=> '$(DISTVNAME)/' },
-	dist  => {
-		DIST_DEFAULT=> 'clean distcheck disttest ci tardist',
-		PREOP => '$(MAKE) -f Makefile.old distdir',
-		COMPRESS => 'gzip -v9', SUFFIX => 'gz',
-	},
+use 5.008002;
+use ExtUtils::MakeMaker;
+# See lib/ExtUtils/MakeMaker.pm for details of how to influence
+# the contents of the Makefile that is written.
+WriteMakefile(
+    NAME              => 'PDF::CreateSimple',
+    VERSION_FROM      => 'lib/PDF/CreateSimple.pm', # finds $VERSION
+    PREREQ_PM         => {'Error'       => 0.15, # for error trapping
+                          'PDF::API2'   => 1.081},# the back bone of PDF::CreateSimple
+    ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
+      (ABSTRACT_FROM  => 'lib/PDF/CreateSimple.pm', # retrieve abstract from module
+       AUTHOR         => 'David Brunelle <david@med.usherbrooke.ca>') : ()),
 );
-
-$Verbose = 1;
-WriteMakefile( %opts );
-
-# end.

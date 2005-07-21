@@ -1,45 +1,27 @@
-New Release: 1.11
+PDF-CreateSimple version 0.01
+=============================
 
-Name           DSLI  Description                                  Info
------------    ----  -------------------------------------------- -----
-PDF            bdpO  Access information in a PDF file             ANTRO
+INSTALLATION
 
-The PDF library is a proposed library for access the information 
-contained inside a PDF file. PDF stands for Portable Document Format and is
-a standard proposed by Adobe ( See http://www.adobe.com/ for more details ) .
+To install this module type the following:
 
-Install "as usual" with:
+   perl Makefile.PL
+   make
+   make test
+   make install
 
-        perl Makefile.PL
-        make
-        make install
+DEPENDENCIES
 
-Then, you can try the scripts in the example directory that tests 
-if a file is a PDF ( not looking at the .pdf extension :-), the PDF 
-version used to write them, their number of pages and the various 
-Info ( Author, Creation date, Crypting, etc. ).
+This module requires these other modules and libraries:
 
-PREREQUISITES:
+  PDF::API2;
 
-A Perl distribution :-)
+COPYRIGHT AND LICENCE
 
-NEWS:
+Copyright (C) 2005 by David Brunelle
 
-Many thanks to Johannes Blach ( dw235@yahoo.com ) for all his work on the library.
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.2 or,
+at your option, any later version of Perl 5 you may have available.
 
-Now we have a better core support, a completly rewritten page section and much more.
 
-AVAILABILITY:
-
-The library is available at 
-
-<http://www.sanface.com/>
-
-and at all CPAN mirror 
-
-Enjoy
-
-Antonio "Antro" Rosella 
-
-<sanface@sanface.com> 
-<antro@tiscalinet.it> 
